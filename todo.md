@@ -1,0 +1,19 @@
+# Project TODO
+
+- [x] Create local subscription, service, plan, and billing-source data models
+- [x] Build a locally persisted subscription store with starter catalog data
+- [x] Replace the starter tab structure with Home, Discover, My Subscriptions, and Settings
+- [x] Implement the Home dashboard with spending summaries and renewal alerts
+- [x] Implement searchable category-based service discovery
+- [x] Implement service details and plan comparison
+- [x] Implement add, edit, archive, and delete subscription records
+- [x] Implement subscription detail with billing-source guidance and official-link handoff
+- [x] Implement local renewal reminder scheduling and preference controls
+- [x] Add local data export and reset controls
+- [x] Add catalog issue-report feedback flow
+- [x] Design responsive iOS-style portrait layouts with accessible touch targets
+- [x] Generate and apply the SubTrack app icon across required app assets
+- [x] Update app configuration with final brand details
+- [x] Add unit tests for spending calculations, persistence, and billing-link resolution
+- [x] Validate core behavior through automated tests and TypeScript checks; browser preview testing is intentionally skipped for this mobile project
+- [ ] Create a final project checkpoint

@@ -1,0 +1,55 @@
+import { describe, expect, it } from "vitest";
+
+import { annualAmount, getUpcomingSubscriptions, isValidDateString, monthlyAmount, resolveManagementUrl, totalAnnual, totalMonthly } from "../lib/subscription-utils";
+import type { SubscriptionRecord } from "../lib/subscription-types";
+
+const baseRecord: SubscriptionRecord = {
+  id: "sub_1",
+  serviceId: "chatgpt",
+  planId: "plus",
+  planName: "Plus",
+  amount: 20,
+  currency: "USD",
+  cadence: "monthly",
+  renewalDate: "2026-10-10",
+  billingSource: "provider",
+  status: "active",
+  reminderEnabled: true,
+  createdAt: "2026-08-13T00:00:00.000Z",
+  updatedAt: "2026-08-13T00:00:00.000Z",
+};
+
+describe("subscription calculations", () => {
+  it("normalizes monthly, quarterly, and annual amounts", () => {
+    expect(monthlyAmount(20, "monthly")).toBe(20);
+    expect(monthlyAmount(30, "quarterly")).toBe(10);
+    expect(monthlyAmount(120, "yearly")).toBe(10);
+    expect(annualAmount(120, "yearly")).toBe(120);
+  });
+
+  it("excludes cancelled records from totals", () => {
+    const cancelled = { ...baseRecord, id: "sub_2", amount: 100, cadence: "yearly" as const, status: "cancelled" as const };
+    expect(totalMonthly([baseRecord, cancelled])).toBe(20);
+    expect(totalAnnual([baseRecord, cancelled])).toBe(240);
+  });
+
+  it("orders upcoming records by renewal date", () => {
+    const later = { ...baseRecord, id: "sub_later", renewalDate: "2026-12-01" };
+    const earlier = { ...baseRecord, id: "sub_earlier", renewalDate: "2026-09-01" };
+    expect(getUpcomingSubscriptions([later, earlier]).map((item) => item.id)).toEqual(["sub_earlier", "sub_later"]);
+  });
+});
+
+describe("subscription safety helpers", () => {
+  it("accepts only real YYYY-MM-DD dates", () => {
+    expect(isValidDateString("2026-09-15")).toBe(true);
+    expect(isValidDateString("15-09-2026")).toBe(false);
+    expect(isValidDateString("2026-02-31")).toBe(false);
+  });
+
+  it("routes store-billed subscriptions to the correct official management authority", () => {
+    expect(resolveManagementUrl({ ...baseRecord, billingSource: "apple" })).toContain("apple.com");
+    expect(resolveManagementUrl({ ...baseRecord, billingSource: "google" })).toContain("play.google.com");
+    expect(resolveManagementUrl(baseRecord)).toContain("chatgpt.com");
+  });
+});
