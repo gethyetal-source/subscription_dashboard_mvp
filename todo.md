@@ -67,3 +67,5 @@
 - [x] Validate deletion, form validation, dates, catalog data, logos, and search and save a checkpoint
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
+- [x] Remove visible subscription-deletion controls from the dashboard and detail screen
+- [x] Validate the deletion-free subscription-management flow and save a checkpoint
