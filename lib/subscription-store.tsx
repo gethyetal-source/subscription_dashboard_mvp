@@ -36,8 +36,14 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
 
   useEffect(() => {
+    let isMounted = true;
+    const hydrationTimeout = setTimeout(() => {
+      if (isMounted) setIsReady(true);
+    }, 1200);
+
     AsyncStorage.getItem(STORAGE_KEY)
       .then((serialized) => {
+        if (!isMounted) return;
         if (!serialized) return;
         const parsed = JSON.parse(serialized) as Partial<StoredState>;
         setSubscriptions(parsed.subscriptions ?? []);
@@ -46,7 +52,15 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       .catch(() => {
         // If local data is malformed, start from a safe empty state.
       })
-      .finally(() => setIsReady(true));
+      .finally(() => {
+        clearTimeout(hydrationTimeout);
+        if (isMounted) setIsReady(true);
+      });
+
+    return () => {
+      isMounted = false;
+      clearTimeout(hydrationTimeout);
+    };
   }, []);
 
   const persist = useCallback(async (nextSubscriptions: SubscriptionRecord[], nextSettings: AppSettings) => {
