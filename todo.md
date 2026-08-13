@@ -72,3 +72,6 @@
 - [x] Add a quick-edit modal for renewal dates and amounts
 - [x] Restore record deletion exclusively in the Subscriptions tab
 - [x] Validate quick editing and Subscriptions-tab deletion and save a checkpoint
+- [x] Restart the development service after the reported preview interruption
+- [x] Resolve the previewer modification state and confirm the preview is available
+- [x] Document the Android APK release path and temporary free authentication and database options
