@@ -77,3 +77,5 @@
 - [x] Document the Android APK release path and temporary free authentication and database options
 - [x] Configure an Expo web export and Vercel output directory to resolve the deployment failure
 - [x] Validate the Vercel-compatible static output and save a checkpoint
+- [x] Verify the committed Vercel settings and resolve the repeated public-output error
+- [x] Remove the invalid Vercel framework field and validate the corrected static-export configuration
