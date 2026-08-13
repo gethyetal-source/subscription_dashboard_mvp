@@ -69,3 +69,6 @@
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
 - [x] Remove visible subscription-deletion controls from the dashboard and detail screen
 - [x] Validate the deletion-free subscription-management flow and save a checkpoint
+- [x] Add a quick-edit modal for renewal dates and amounts
+- [x] Restore record deletion exclusively in the Subscriptions tab
+- [x] Validate quick editing and Subscriptions-tab deletion and save a checkpoint

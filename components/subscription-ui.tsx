@@ -45,16 +45,19 @@ export function SecondaryButton({ label, onPress, style }: { label: string; onPr
   return <Pressable onPress={onPress} style={({ pressed }) => [styles.secondaryButton, style, pressed && styles.buttonPressed]}><Text style={styles.secondaryButtonText}>{label}</Text></Pressable>;
 }
 
-export function SubscriptionRow({ item, onPress }: { item: SubscriptionRecord; onPress: () => void }) {
+export function SubscriptionRow({ item, onPress, onQuickEdit, onDelete }: { item: SubscriptionRecord; onPress: () => void; onQuickEdit?: () => void; onDelete?: () => void }) {
   const service = getService(item.serviceId);
   const tone = item.status === "trial" ? "amber" : item.status === "cancelled" ? "coral" : item.status === "uncertain" ? "neutral" : "teal";
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.subscriptionRow, pressed && styles.rowPressed]}>
-      <ServiceBadge serviceId={item.serviceId} />
-      <View style={styles.subscriptionCopy}><Text style={styles.subscriptionName}>{service?.name ?? "Subscription"}</Text><Text style={styles.subscriptionMeta}>{item.planName} · {formatRelativeRenewal(item.renewalDate)}</Text></View>
-      <View style={styles.subscriptionAmount}><Text style={styles.amount}>{formatCurrency(item.amount, item.currency)}</Text><Pill label={item.status} tone={tone} /></View>
-      <Text style={styles.chevron}>›</Text>
-    </Pressable>
+    <View style={styles.subscriptionCard}>
+      <Pressable onPress={onPress} style={({ pressed }) => [styles.subscriptionRow, pressed && styles.rowPressed]}>
+        <ServiceBadge serviceId={item.serviceId} />
+        <View style={styles.subscriptionCopy}><Text style={styles.subscriptionName}>{service?.name ?? "Subscription"}</Text><Text style={styles.subscriptionMeta}>{item.planName} · {formatRelativeRenewal(item.renewalDate)}</Text></View>
+        <View style={styles.subscriptionAmount}><Text style={styles.amount}>{formatCurrency(item.amount, item.currency)}</Text><Pill label={item.status} tone={tone} /></View>
+        <Text style={styles.chevron}>›</Text>
+      </Pressable>
+      {onQuickEdit || onDelete ? <><View style={styles.rowDivider} /><View style={styles.rowActions}>{onQuickEdit ? <Pressable onPress={onQuickEdit} style={({ pressed }) => [styles.rowAction, pressed && styles.rowPressed]}><Text style={styles.quickEditText}>Quick edit</Text></Pressable> : null}{onDelete ? <Pressable onPress={onDelete} style={({ pressed }) => [styles.rowAction, pressed && styles.rowPressed]}><Text style={styles.deleteText}>Delete</Text></Pressable> : null}</View></> : null}
+    </View>
   );
 }
 
@@ -78,9 +81,9 @@ const styles = StyleSheet.create({
   secondaryButton: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 24, borderWidth: 1, justifyContent: "center", minHeight: 48, paddingHorizontal: 18 },
   secondaryButtonText: { color: "#1A73E8", fontFamily: type.semi, fontSize: 14 },
   buttonPressed: { opacity: 0.78, transform: [{ scale: 0.99 }] }, buttonDisabled: { backgroundColor: "#AECBFA" },
-  subscriptionRow: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 12, minHeight: 76, padding: 12 },
+  subscriptionCard: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, overflow: "hidden" }, subscriptionRow: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 76, padding: 12 },
   rowPressed: { backgroundColor: "#F8F9FA" }, subscriptionCopy: { flex: 1, minWidth: 0 }, subscriptionName: { color: "#202124", fontFamily: type.semi, fontSize: 14 }, subscriptionMeta: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, marginTop: 3 },
-  subscriptionAmount: { alignItems: "flex-end", gap: 4 }, amount: { color: "#202124", fontFamily: type.semi, fontSize: 13 }, chevron: { color: "#9AA0A6", fontFamily: type.regular, fontSize: 24, lineHeight: 24 },
+  subscriptionAmount: { alignItems: "flex-end", gap: 4 }, amount: { color: "#202124", fontFamily: type.semi, fontSize: 13 }, chevron: { color: "#9AA0A6", fontFamily: type.regular, fontSize: 24, lineHeight: 24 }, rowDivider: { backgroundColor: "#E8EAED", height: 1 }, rowActions: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 6, paddingVertical: 4 }, rowAction: { paddingHorizontal: 12, paddingVertical: 7 }, quickEditText: { color: "#1A73E8", fontFamily: type.semi, fontSize: 11 }, deleteText: { color: "#C5221F", fontFamily: type.semi, fontSize: 11 },
   emptyState: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderStyle: "dashed", borderWidth: 1, paddingHorizontal: 28, paddingVertical: 34 },
   emptySymbol: { alignItems: "center", backgroundColor: "#E8F0FE", borderRadius: 22, height: 44, justifyContent: "center", marginBottom: 12, width: 44 }, emptySymbolText: { color: "#1A73E8", fontFamily: type.regular, fontSize: 26, lineHeight: 28 },
   emptyTitle: { color: "#202124", fontFamily: type.semi, fontSize: 15, textAlign: "center" }, emptyBody: { color: "#5F6368", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 6, maxWidth: 270, textAlign: "center" },
