@@ -5,52 +5,20 @@ import { Pill, PrimaryButton, SecondaryButton, ServiceBadge } from "@/components
 import { getService } from "@/lib/catalog";
 import { ScreenContainer } from "@/components/screen-container";
 
+const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
+
 export default function ServiceDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const service = getService(id);
-  if (!service) return <ScreenContainer className="p-5"><Text style={styles.missing}>This catalog service could not be found.</Text></ScreenContainer>;
-
-  return (
-    <ScreenContainer className="px-5" containerClassName="bg-background">
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.nav}><Pressable onPress={() => router.back()} hitSlop={8}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.navTitle}>Service details</Text><View style={{ width: 24 }} /></View>
-        <View style={styles.hero}><ServiceBadge serviceId={service.id} size="large" /><View style={styles.heroCopy}><Pill label={service.category} tone="teal" /><Text style={styles.title}>{service.name}</Text><Text style={styles.description}>{service.description}</Text></View></View>
-        <View style={styles.notice}><Text style={styles.noticeTitle}>Reference information</Text><Text style={styles.noticeBody}>Plan details are a guide. Check the official website for your country before purchasing or changing a plan.</Text></View>
-        <View style={styles.sectionRow}><Text style={styles.sectionTitle}>Plan options</Text><Pressable onPress={() => router.push(`/compare/${service.id}`)}><Text style={styles.compareLink}>Compare all</Text></Pressable></View>
-        <View style={styles.planList}>{service.plans.map((plan) => <View key={plan.id} style={styles.planCard}><View style={styles.planTop}><View><Text style={styles.planName}>{plan.name}</Text><Text style={styles.planSummary}>{plan.summary}</Text></View><Text style={styles.price}>{plan.priceLabel}</Text></View><View style={styles.featureRow}>{plan.features.slice(0, 3).map((feature) => <View key={feature} style={styles.feature}><Text style={styles.featureDot}>•</Text><Text style={styles.featureText}>{feature}</Text></View>)}</View></View>)}</View>
-        <SecondaryButton label="Compare plans" onPress={() => router.push(`/compare/${service.id}`)} />
-        <PrimaryButton label="Add to my subscriptions" onPress={() => router.push(`/subscription/edit?serviceId=${service.id}` as never)} />
-        <Pressable onPress={() => Alert.alert("Official management", service.managementHint)}><Text style={styles.managementHint}>Already subscribed? We’ll guide you to the official management page after you add the subscription.</Text></Pressable>
-      </ScrollView>
-    </ScreenContainer>
-  );
+  const { id } = useLocalSearchParams<{ id: string }>(); const service = getService(id);
+  if (!service) return <ScreenContainer className="p-5"><Text style={styles.missing}>This service is not available in the catalog.</Text></ScreenContainer>;
+  return <ScreenContainer className="px-5" containerClassName="bg-background"><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+    <View style={styles.nav}><Pressable onPress={() => router.back()} hitSlop={10}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.navTitle}>Service details</Text><View style={{ width: 26 }} /></View>
+    <View style={styles.hero}><ServiceBadge serviceId={service.id} size="large" /><View style={{ flex: 1 }}><Pill label={service.category} tone="neutral" /><Text style={styles.title}>{service.name}</Text><Text style={styles.description}>{service.description}</Text></View></View>
+    <View style={styles.notice}><Text style={styles.noticeTitle}>Plan details are reference information</Text><Text style={styles.noticeBody}>Current pricing, availability, and features can differ by country. Always confirm on the provider’s official page.</Text></View>
+    <View style={styles.sectionRow}><Text style={styles.section}>Plan options</Text><Pressable onPress={() => router.push(`/compare/${service.id}`)}><Text style={styles.textAction}>Compare</Text></Pressable></View>
+    <View style={styles.planList}>{service.plans.map((plan) => <View key={plan.id} style={styles.plan}><View style={styles.planTop}><View style={{ flex: 1 }}><Text style={styles.planName}>{plan.name}</Text><Text style={styles.planSummary}>{plan.summary}</Text></View><Text style={styles.price}>{plan.priceLabel}</Text></View><View style={styles.featureList}>{plan.features.slice(0, 3).map((feature) => <View key={feature} style={styles.feature}><Text style={styles.featureDot}>•</Text><Text style={styles.featureText}>{feature}</Text></View>)}</View></View>)}</View>
+    <SecondaryButton label="Compare plan options" onPress={() => router.push(`/compare/${service.id}`)} />
+    <PrimaryButton label="Add to my subscriptions" onPress={() => router.push(`/subscription/edit?serviceId=${service.id}` as never)} />
+    <Pressable onPress={() => Alert.alert("Official management", service.managementHint)}><Text style={styles.help}>Already subscribed? Add your record to access guidance for the official management page.</Text></Pressable>
+  </ScrollView></ScreenContainer>;
 }
-
-const styles = StyleSheet.create({
-  content: { paddingTop: 12, paddingBottom: 30, gap: 16 },
-  nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  back: { color: "#10253F", fontSize: 34, lineHeight: 34, fontWeight: "300" },
-  navTitle: { color: "#10253F", fontSize: 14, fontWeight: "800" },
-  hero: { flexDirection: "row", gap: 15, alignItems: "flex-start", paddingTop: 10 },
-  heroCopy: { flex: 1 },
-  title: { color: "#10253F", fontSize: 25, fontWeight: "800", letterSpacing: -0.7, marginTop: 9 },
-  description: { color: "#667085", fontSize: 13, lineHeight: 19, marginTop: 5 },
-  notice: { backgroundColor: "#FFF4DF", borderRadius: 16, padding: 14 },
-  noticeTitle: { color: "#9B650E", fontSize: 12, fontWeight: "900" },
-  noticeBody: { color: "#806128", fontSize: 12, lineHeight: 17, marginTop: 4 },
-  sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 3 },
-  sectionTitle: { color: "#10253F", fontSize: 17, fontWeight: "800" },
-  compareLink: { color: "#0E9F8A", fontSize: 13, fontWeight: "800" },
-  planList: { gap: 10 },
-  planCard: { borderWidth: 1, borderColor: "#E6ECF2", borderRadius: 18, padding: 15, backgroundColor: "#FFFFFF" },
-  planTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
-  planName: { color: "#10253F", fontSize: 15, fontWeight: "800" },
-  planSummary: { color: "#667085", fontSize: 12, lineHeight: 17, marginTop: 4, maxWidth: 210 },
-  price: { color: "#087B6C", fontSize: 11, lineHeight: 16, textAlign: "right", fontWeight: "800", maxWidth: 95 },
-  featureRow: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 13 },
-  feature: { flexDirection: "row", gap: 4, alignItems: "center", backgroundColor: "#F2F6F9", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5 },
-  featureDot: { color: "#0E9F8A", fontSize: 12, fontWeight: "900" },
-  featureText: { color: "#526476", fontSize: 10, fontWeight: "700" },
-  managementHint: { color: "#667085", fontSize: 12, lineHeight: 17, textAlign: "center", marginTop: -5 },
-  missing: { color: "#667085", fontSize: 15 },
-});
+const styles = StyleSheet.create({ content: { gap: 16, paddingBottom: 30, paddingTop: 12 }, nav: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, back: { color: "#3C4043", fontFamily: type.regular, fontSize: 34, lineHeight: 34 }, navTitle: { color: "#3C4043", fontFamily: type.semi, fontSize: 13 }, hero: { alignItems: "flex-start", flexDirection: "row", gap: 14, paddingTop: 6 }, title: { color: "#202124", fontFamily: type.bold, fontSize: 24, letterSpacing: -0.7, marginTop: 8 }, description: { color: "#5F6368", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 4 }, notice: { backgroundColor: "#FEF7E0", borderRadius: 14, padding: 14 }, noticeTitle: { color: "#7A4700", fontFamily: type.semi, fontSize: 12 }, noticeBody: { color: "#66521F", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 4 }, sectionRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginTop: 2 }, section: { color: "#202124", fontFamily: type.semi, fontSize: 17 }, textAction: { color: "#1A73E8", fontFamily: type.semi, fontSize: 13 }, planList: { gap: 10 }, plan: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, padding: 14 }, planTop: { flexDirection: "row", gap: 10, justifyContent: "space-between" }, planName: { color: "#202124", fontFamily: type.semi, fontSize: 14 }, planSummary: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 3 }, price: { color: "#1967D2", fontFamily: type.semi, fontSize: 10, lineHeight: 15, maxWidth: 100, textAlign: "right" }, featureList: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 }, feature: { alignItems: "center", backgroundColor: "#F8F9FA", borderRadius: 8, flexDirection: "row", gap: 4, paddingHorizontal: 7, paddingVertical: 4 }, featureDot: { color: "#1A73E8", fontFamily: type.bold, fontSize: 11 }, featureText: { color: "#5F6368", fontFamily: type.regular, fontSize: 10 }, help: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, lineHeight: 16, textAlign: "center" }, missing: { color: "#5F6368", fontFamily: type.regular, fontSize: 14 } });

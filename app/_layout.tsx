@@ -1,8 +1,10 @@
 import "@/global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Text, TextInput } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
@@ -23,11 +25,29 @@ import { SubscriptionProvider } from "@/lib/subscription-store";
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
+const defaultTextProps = (Text as typeof Text & { defaultProps?: { style?: unknown } }).defaultProps ?? {};
+(Text as typeof Text & { defaultProps?: { style?: unknown } }).defaultProps = {
+  ...defaultTextProps,
+  style: [defaultTextProps.style, { fontFamily: "Poppins-Regular" }],
+};
+
+const defaultTextInputProps = (TextInput as typeof TextInput & { defaultProps?: { style?: unknown } }).defaultProps ?? {};
+(TextInput as typeof TextInput & { defaultProps?: { style?: unknown } }).defaultProps = {
+  ...defaultTextInputProps,
+  style: [defaultTextInputProps.style, { fontFamily: "Poppins-Regular" }],
+};
+
 export const unstable_settings = {
   anchor: "(tabs)",
 };
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    "Poppins-Regular": require("../assets/fonts/Poppins-Regular.ttf"),
+    "Poppins-Medium": require("../assets/fonts/Poppins-Medium.ttf"),
+    "Poppins-SemiBold": require("../assets/fonts/Poppins-SemiBold.ttf"),
+    "Poppins-Bold": require("../assets/fonts/Poppins-Bold.ttf"),
+  });
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
 
@@ -79,7 +99,7 @@ export default function RootLayout() {
     };
   }, [initialInsets, initialFrame]);
 
-  const content = (
+  const content = fontsLoaded ? (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
@@ -100,7 +120,7 @@ export default function RootLayout() {
         </QueryClientProvider>
       </trpc.Provider>
     </GestureHandlerRootView>
-  );
+  ) : null;
 
   const shouldOverrideSafeArea = Platform.OS === "web";
 

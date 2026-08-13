@@ -12,109 +12,31 @@ import { isValidDateString } from "@/lib/subscription-utils";
 const cadenceOptions: BillingCadence[] = ["weekly", "monthly", "quarterly", "yearly"];
 const billingSources: BillingSource[] = ["apple", "google", "provider", "carrier", "reseller", "unknown"];
 const statuses: SubscriptionStatus[] = ["active", "trial", "uncertain"];
+const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
 export default function EditSubscriptionScreen() {
   const { serviceId, subscriptionId } = useLocalSearchParams<{ serviceId?: string; subscriptionId?: string }>();
   const { subscriptions, addSubscription, updateSubscription } = useSubscriptions();
   const existing = subscriptions.find((item) => item.id === subscriptionId);
-  const selectedServiceId = existing?.serviceId ?? serviceId ?? "";
-  const service = getService(selectedServiceId);
-  const initialPlan = useMemo(() => {
-    const found = service?.plans.find((plan) => plan.id === existing?.planId) ?? service?.plans[0];
-    return found;
-  }, [existing?.planId, service]);
-  const [planId, setPlanId] = useState(existing?.planId ?? initialPlan?.id ?? "");
-  const [planName, setPlanName] = useState(existing?.planName ?? initialPlan?.name ?? "");
-  const [amount, setAmount] = useState(existing ? String(existing.amount) : "");
-  const [currency, setCurrency] = useState(existing?.currency ?? "USD");
-  const [cadence, setCadence] = useState<BillingCadence>(existing?.cadence ?? initialPlan?.cadence ?? "monthly");
-  const [renewalDate, setRenewalDate] = useState(existing?.renewalDate ?? "");
-  const [trialEndDate, setTrialEndDate] = useState(existing?.trialEndDate ?? "");
-  const [billingSource, setBillingSource] = useState<BillingSource>(existing?.billingSource ?? "provider");
-  const [status, setStatus] = useState<SubscriptionStatus>(existing?.status === "cancelled" ? "active" : existing?.status ?? "active");
-  const [notes, setNotes] = useState(existing?.notes ?? "");
-  const [reminderEnabled, setReminderEnabled] = useState(existing?.reminderEnabled ?? true);
-  const [saving, setSaving] = useState(false);
-
-  const selectPlan = (nextPlanId: string) => {
-    const next = service?.plans.find((plan) => plan.id === nextPlanId);
-    if (!next) return;
-    setPlanId(next.id); setPlanName(next.name); setCadence(next.cadence);
-  };
-
-  const save = async () => {
-    if (!service) return Alert.alert("Select a service", "Start from the catalog and choose the service you want to track.");
-    const numericAmount = Number.parseFloat(amount.replace(",", "."));
-    if (!Number.isFinite(numericAmount) || numericAmount < 0) return Alert.alert("Add a valid price", "Enter the amount you actually pay for this plan.");
-    if (!isValidDateString(renewalDate)) return Alert.alert("Add a renewal date", "Use the YYYY-MM-DD format, for example 2026-09-15.");
-    if (trialEndDate && !isValidDateString(trialEndDate)) return Alert.alert("Check the trial date", "Use the YYYY-MM-DD format, or leave it blank.");
-    const draft: SubscriptionDraft = { serviceId: service.id, planId, planName: planName || service.name, amount: numericAmount, currency: currency.toUpperCase().slice(0, 3), cadence, renewalDate, trialEndDate: trialEndDate || undefined, billingSource, status, notes: notes.trim() || undefined, reminderEnabled };
-    setSaving(true);
-    try {
-      const saved = existing ? await updateSubscription(existing.id, draft) : await addSubscription(draft);
-      if (!saved) throw new Error("The subscription could not be saved.");
-      router.replace(`/subscription/${saved.id}` as never);
-    } catch (error) {
-      Alert.alert("Could not save", error instanceof Error ? error.message : "Please try again.");
-    } finally { setSaving(false); }
-  };
-
+  const service = getService(existing?.serviceId ?? serviceId ?? "");
+  const starter = useMemo(() => service?.plans.find((plan) => plan.id === existing?.planId) ?? service?.plans[0], [existing?.planId, service]);
+  const [planId, setPlanId] = useState(existing?.planId ?? starter?.id ?? ""); const [planName, setPlanName] = useState(existing?.planName ?? starter?.name ?? "");
+  const [amount, setAmount] = useState(existing ? String(existing.amount) : ""); const [currency, setCurrency] = useState(existing?.currency ?? "USD"); const [cadence, setCadence] = useState<BillingCadence>(existing?.cadence ?? starter?.cadence ?? "monthly");
+  const [renewalDate, setRenewalDate] = useState(existing?.renewalDate ?? ""); const [trialEndDate, setTrialEndDate] = useState(existing?.trialEndDate ?? ""); const [billingSource, setBillingSource] = useState<BillingSource>(existing?.billingSource ?? "provider"); const [status, setStatus] = useState<SubscriptionStatus>(existing?.status === "cancelled" ? "active" : existing?.status ?? "active"); const [notes, setNotes] = useState(existing?.notes ?? ""); const [reminderEnabled, setReminderEnabled] = useState(existing?.reminderEnabled ?? true); const [saving, setSaving] = useState(false);
+  const selectPlan = (id: string) => { const plan = service?.plans.find((item) => item.id === id); if (!plan) return; setPlanId(plan.id); setPlanName(plan.name); setCadence(plan.cadence); };
+  const save = async () => { if (!service) return Alert.alert("Select a service", "Choose a service from Discover first."); const value = Number.parseFloat(amount.replace(",", ".")); if (!Number.isFinite(value) || value < 0) return Alert.alert("Check the price", "Enter the amount you actually pay."); if (!isValidDateString(renewalDate)) return Alert.alert("Check the renewal date", "Use YYYY-MM-DD, for example 2026-09-15."); if (trialEndDate && !isValidDateString(trialEndDate)) return Alert.alert("Check the trial date", "Use YYYY-MM-DD or leave it blank."); const draft: SubscriptionDraft = { serviceId: service.id, planId, planName: planName || service.name, amount: value, currency: currency.toUpperCase().slice(0, 3), cadence, renewalDate, trialEndDate: trialEndDate || undefined, billingSource, status, notes: notes.trim() || undefined, reminderEnabled }; setSaving(true); try { const saved = existing ? await updateSubscription(existing.id, draft) : await addSubscription(draft); if (!saved) throw new Error("The record could not be saved."); router.replace(`/subscription/${saved.id}` as never); } catch (error) { Alert.alert("Could not save", error instanceof Error ? error.message : "Please try again."); } finally { setSaving(false); } };
   if (!service) return <ScreenContainer className="p-5"><Text style={styles.missing}>Choose a service from Discover before adding a subscription.</Text><Pressable onPress={() => router.replace("/(tabs)/discover")}><Text style={styles.discoverLink}>Open Discover</Text></Pressable></ScreenContainer>;
-
-  return (
-    <ScreenContainer className="px-5" containerClassName="bg-background" edges={["top", "bottom", "left", "right"]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <View style={styles.nav}><Pressable onPress={() => router.back()} hitSlop={8}><Text style={styles.close}>×</Text></Pressable><Text style={styles.navTitle}>{existing ? "Edit subscription" : "Add subscription"}</Text><View style={{ width: 25 }} /></View>
-        <View style={styles.serviceSummary}><ServiceBadge serviceId={service.id} size="large" /><View><Text style={styles.serviceName}>{service.name}</Text><Text style={styles.serviceMeta}>{service.category}</Text></View><Pressable onPress={() => router.replace("/(tabs)/discover")}><Text style={styles.change}>Change</Text></Pressable></View>
-        <Text style={styles.section}>Your plan</Text>
-        <View style={styles.optionGroup}>{service.plans.map((plan) => <Pressable key={plan.id} onPress={() => selectPlan(plan.id)} style={({ pressed }) => [styles.option, planId === plan.id && styles.optionSelected, pressed && styles.pressed]}><Text style={[styles.optionText, planId === plan.id && styles.optionTextSelected]}>{plan.name}</Text><Text style={[styles.optionSubtext, planId === plan.id && styles.optionSubtextSelected]}>{plan.priceLabel}</Text></Pressable>)}</View>
-        <Text style={styles.section}>What you pay</Text>
-        <View style={styles.inputRow}><View style={styles.amountBox}><Text style={styles.inputLabel}>Amount</Text><TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor="#98A3B3" style={styles.amountInput} /></View><View style={styles.currencyBox}><Text style={styles.inputLabel}>Currency</Text><TextInput value={currency} onChangeText={setCurrency} autoCapitalize="characters" maxLength={3} placeholder="USD" placeholderTextColor="#98A3B3" style={styles.currencyInput} /></View></View>
-        <View style={styles.frequencyRow}>{cadenceOptions.map((item) => <Pressable key={item} onPress={() => setCadence(item)} style={({ pressed }) => [styles.frequency, cadence === item && styles.frequencySelected, pressed && styles.pressed]}><Text style={[styles.frequencyText, cadence === item && styles.frequencyTextSelected]}>{item}</Text></Pressable>)}</View>
-        <Text style={styles.section}>Dates</Text>
-        <View style={styles.dateCard}><Text style={styles.inputLabel}>Next renewal</Text><TextInput value={renewalDate} onChangeText={setRenewalDate} placeholder="YYYY-MM-DD" placeholderTextColor="#98A3B3" style={styles.dateInput} /></View>
-        {status === "trial" ? <View style={styles.dateCard}><Text style={styles.inputLabel}>Trial ends</Text><TextInput value={trialEndDate} onChangeText={setTrialEndDate} placeholder="YYYY-MM-DD" placeholderTextColor="#98A3B3" style={styles.dateInput} /></View> : null}
-        <Text style={styles.section}>Subscription status</Text>
-        <View style={styles.frequencyRow}>{statuses.map((item) => <Pressable key={item} onPress={() => setStatus(item)} style={({ pressed }) => [styles.frequency, status === item && styles.frequencySelected, pressed && styles.pressed]}><Text style={[styles.frequencyText, status === item && styles.frequencyTextSelected]}>{item}</Text></Pressable>)}</View>
-        <Text style={styles.section}>Who bills you?</Text>
-        <View style={styles.billingList}>{billingSources.map((item) => <Pressable key={item} onPress={() => setBillingSource(item)} style={({ pressed }) => [styles.billingOption, billingSource === item && styles.billingSelected, pressed && styles.pressed]}><View style={styles.radio}>{billingSource === item ? <View style={styles.radioDot} /> : null}</View><View style={styles.billingCopy}><Text style={styles.billingTitle}>{billingSourceMeta[item].label}</Text><Text style={styles.billingDescription}>{billingSourceMeta[item].description}</Text></View></Pressable>)}</View>
-        <View style={styles.reminderRow}><View style={styles.reminderCopy}><Text style={styles.reminderTitle}>Renewal reminder</Text><Text style={styles.reminderBody}>Schedule a local alert before this subscription renews.</Text></View><Switch value={reminderEnabled} onValueChange={setReminderEnabled} trackColor={{ false: "#D5DEE7", true: "#7FD3C4" }} thumbColor={reminderEnabled ? "#0E9F8A" : "#FFFFFF"} /></View>
-        <Text style={styles.section}>Note (optional)</Text><TextInput value={notes} onChangeText={setNotes} placeholder="e.g. Shared with family" placeholderTextColor="#98A3B3" style={styles.notes} multiline textAlignVertical="top" />
-        <PrimaryButton label={saving ? "Saving…" : existing ? "Save changes" : "Add subscription"} onPress={() => void save()} disabled={saving} />
-      </ScrollView>
-    </ScreenContainer>
-  );
+  return <ScreenContainer className="px-5" containerClassName="bg-background" edges={["top", "bottom", "left", "right"]}><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <View style={styles.nav}><Pressable onPress={() => router.back()} hitSlop={10}><Text style={styles.close}>×</Text></Pressable><Text style={styles.navTitle}>{existing ? "Edit subscription" : "Add subscription"}</Text><View style={{ width: 24 }} /></View>
+    <View style={styles.serviceRow}><ServiceBadge serviceId={service.id} size="regular" /><View style={{ flex: 1 }}><Text style={styles.serviceName}>{service.name}</Text><Text style={styles.serviceMeta}>{service.category}</Text></View><Pressable onPress={() => router.replace("/(tabs)/discover")}><Text style={styles.change}>Change</Text></Pressable></View>
+    <Text style={styles.section}>Plan</Text><View style={styles.options}>{service.plans.map((plan) => <Pressable key={plan.id} onPress={() => selectPlan(plan.id)} style={({ pressed }) => [styles.option, planId === plan.id && styles.optionSelected, pressed && styles.pressed]}><Text style={[styles.optionName, planId === plan.id && styles.optionSelectedText]}>{plan.name}</Text><Text style={[styles.optionPrice, planId === plan.id && styles.optionSelectedText]}>{plan.priceLabel}</Text></Pressable>)}</View>
+    <Text style={styles.section}>Price and billing</Text><View style={styles.inputRow}><View style={{ flex: 1.35 }}><Text style={styles.fieldLabel}>Amount</Text><TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor="#80868B" style={styles.input} /></View><View style={{ flex: 0.65 }}><Text style={styles.fieldLabel}>Currency</Text><TextInput value={currency} onChangeText={setCurrency} autoCapitalize="characters" maxLength={3} placeholder="USD" placeholderTextColor="#80868B" style={styles.input} /></View></View><View style={styles.chips}>{cadenceOptions.map((item) => <Pressable key={item} onPress={() => setCadence(item)} style={({ pressed }) => [styles.chip, cadence === item && styles.chipSelected, pressed && styles.pressed]}><Text style={[styles.chipText, cadence === item && styles.chipTextSelected]}>{item}</Text></Pressable>)}</View>
+    <Text style={styles.section}>Dates</Text><View style={styles.inputCard}><Text style={styles.fieldLabel}>Next renewal</Text><TextInput value={renewalDate} onChangeText={setRenewalDate} placeholder="YYYY-MM-DD" placeholderTextColor="#80868B" style={styles.dateInput} /></View>{status === "trial" ? <View style={styles.inputCard}><Text style={styles.fieldLabel}>Trial ends</Text><TextInput value={trialEndDate} onChangeText={setTrialEndDate} placeholder="YYYY-MM-DD" placeholderTextColor="#80868B" style={styles.dateInput} /></View> : null}
+    <Text style={styles.section}>Status</Text><View style={styles.chips}>{statuses.map((item) => <Pressable key={item} onPress={() => setStatus(item)} style={({ pressed }) => [styles.chip, status === item && styles.chipSelected, pressed && styles.pressed]}><Text style={[styles.chipText, status === item && styles.chipTextSelected]}>{item}</Text></Pressable>)}</View>
+    <Text style={styles.section}>Billing source</Text><View style={styles.sources}>{billingSources.map((item) => <Pressable key={item} onPress={() => setBillingSource(item)} style={({ pressed }) => [styles.source, billingSource === item && styles.sourceSelected, pressed && styles.pressed]}><View style={styles.radio}>{billingSource === item ? <View style={styles.radioDot} /> : null}</View><View style={{ flex: 1 }}><Text style={styles.sourceTitle}>{billingSourceMeta[item].label}</Text><Text style={styles.sourceBody}>{billingSourceMeta[item].description}</Text></View></Pressable>)}</View>
+    <View style={styles.reminder}><View style={{ flex: 1 }}><Text style={styles.reminderTitle}>Renewal reminder</Text><Text style={styles.reminderBody}>Schedule a local alert before the renewal date.</Text></View><Switch value={reminderEnabled} onValueChange={setReminderEnabled} trackColor={{ false: "#DADCE0", true: "#AECBFA" }} thumbColor={reminderEnabled ? "#1A73E8" : "#FFFFFF"} /></View>
+    <Text style={styles.section}>Note (optional)</Text><TextInput value={notes} onChangeText={setNotes} placeholder="For example, shared with family" placeholderTextColor="#80868B" multiline textAlignVertical="top" style={styles.notes} />
+    <PrimaryButton label={saving ? "Saving…" : existing ? "Save changes" : "Add subscription"} onPress={() => void save()} disabled={saving} />
+  </ScrollView></ScreenContainer>;
 }
-
-const styles = StyleSheet.create({
-  content: { paddingTop: 8, paddingBottom: 26, gap: 10 },
-  nav: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
-  close: { color: "#10253F", fontSize: 30, lineHeight: 30, fontWeight: "300" },
-  navTitle: { color: "#10253F", fontSize: 15, fontWeight: "800" },
-  serviceSummary: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#FFFFFF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#E6ECF2" },
-  serviceName: { color: "#10253F", fontSize: 16, fontWeight: "800" },
-  serviceMeta: { color: "#667085", fontSize: 12, marginTop: 3, fontWeight: "600" },
-  change: { color: "#0E9F8A", fontSize: 12, fontWeight: "800", marginLeft: "auto" },
-  section: { color: "#10253F", fontSize: 15, fontWeight: "800", marginTop: 10 },
-  optionGroup: { gap: 8 },
-  option: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 13, borderRadius: 14, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E6ECF2" },
-  optionSelected: { backgroundColor: "#F2FCF9", borderColor: "#0E9F8A" },
-  optionText: { color: "#10253F", fontSize: 14, fontWeight: "800" }, optionTextSelected: { color: "#087B6C" },
-  optionSubtext: { color: "#667085", fontSize: 11, fontWeight: "700" }, optionSubtextSelected: { color: "#087B6C" },
-  inputRow: { flexDirection: "row", gap: 10 }, amountBox: { flex: 1.4 }, currencyBox: { flex: 0.6 },
-  inputLabel: { color: "#667085", fontSize: 11, fontWeight: "800", marginBottom: 6 },
-  amountInput: { height: 48, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#DDE4EC", borderRadius: 13, paddingHorizontal: 13, color: "#10253F", fontSize: 16, fontWeight: "800" },
-  currencyInput: { height: 48, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#DDE4EC", borderRadius: 13, paddingHorizontal: 13, color: "#10253F", fontSize: 15, fontWeight: "800" },
-  frequencyRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  frequency: { backgroundColor: "#EAF0F5", paddingVertical: 9, paddingHorizontal: 12, borderRadius: 99 }, frequencySelected: { backgroundColor: "#10253F" },
-  frequencyText: { color: "#667085", fontSize: 12, fontWeight: "800", textTransform: "capitalize" }, frequencyTextSelected: { color: "#FFFFFF" },
-  dateCard: { backgroundColor: "#FFFFFF", padding: 12, borderWidth: 1, borderColor: "#DDE4EC", borderRadius: 14 },
-  dateInput: { color: "#10253F", fontSize: 15, fontWeight: "800", height: 23 },
-  billingList: { gap: 7 },
-  billingOption: { flexDirection: "row", gap: 10, padding: 12, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E6ECF2", borderRadius: 14 }, billingSelected: { borderColor: "#0E9F8A", backgroundColor: "#F2FCF9" },
-  radio: { height: 18, width: 18, borderRadius: 9, borderWidth: 2, borderColor: "#A3B1C0", alignItems: "center", justifyContent: "center", marginTop: 1 }, radioDot: { height: 8, width: 8, borderRadius: 4, backgroundColor: "#0E9F8A" },
-  billingCopy: { flex: 1 }, billingTitle: { color: "#10253F", fontSize: 13, fontWeight: "800" }, billingDescription: { color: "#667085", fontSize: 11, lineHeight: 15, marginTop: 2 },
-  reminderRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, backgroundColor: "#EAF7F4", borderRadius: 15, marginTop: 2 }, reminderCopy: { flex: 1 }, reminderTitle: { color: "#087B6C", fontSize: 13, fontWeight: "800" }, reminderBody: { color: "#3A6D66", fontSize: 11, lineHeight: 16, marginTop: 3 },
-  notes: { minHeight: 78, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#DDE4EC", borderRadius: 14, padding: 12, color: "#10253F", fontSize: 13, lineHeight: 18 },
-  missing: { color: "#667085", fontSize: 15 }, discoverLink: { color: "#0E9F8A", fontWeight: "800", marginTop: 10 }, pressed: { opacity: 0.72 },
-});
+const styles = StyleSheet.create({ content: { gap: 10, paddingBottom: 26, paddingTop: 8 }, nav: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 5 }, close: { color: "#3C4043", fontFamily: type.regular, fontSize: 28, lineHeight: 28 }, navTitle: { color: "#3C4043", fontFamily: type.semi, fontSize: 13 }, serviceRow: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 11, padding: 13 }, serviceName: { color: "#202124", fontFamily: type.semi, fontSize: 14 }, serviceMeta: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, marginTop: 2 }, change: { color: "#1A73E8", fontFamily: type.semi, fontSize: 12 }, section: { color: "#202124", fontFamily: type.semi, fontSize: 15, marginTop: 10 }, options: { gap: 8 }, option: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 14, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", padding: 13 }, optionSelected: { backgroundColor: "#F8FBFF", borderColor: "#1A73E8" }, optionName: { color: "#202124", fontFamily: type.semi, fontSize: 13 }, optionPrice: { color: "#5F6368", fontFamily: type.regular, fontSize: 10, maxWidth: 120, textAlign: "right" }, optionSelectedText: { color: "#1967D2" }, inputRow: { flexDirection: "row", gap: 10 }, fieldLabel: { color: "#5F6368", fontFamily: type.semi, fontSize: 10, marginBottom: 5 }, input: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 12, borderWidth: 1, color: "#202124", fontFamily: type.semi, fontSize: 14, height: 46, paddingHorizontal: 12 }, chips: { flexDirection: "row", flexWrap: "wrap", gap: 7 }, chip: { backgroundColor: "#F1F3F4", borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 }, chipSelected: { backgroundColor: "#E8F0FE" }, chipText: { color: "#3C4043", fontFamily: type.semi, fontSize: 10, textTransform: "capitalize" }, chipTextSelected: { color: "#1967D2" }, inputCard: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 12, borderWidth: 1, padding: 11 }, dateInput: { color: "#202124", fontFamily: type.semi, fontSize: 14, height: 22 }, sources: { gap: 7 }, source: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, padding: 12 }, sourceSelected: { backgroundColor: "#F8FBFF", borderColor: "#1A73E8" }, radio: { alignItems: "center", borderColor: "#9AA0A6", borderRadius: 9, borderWidth: 2, height: 18, justifyContent: "center", marginTop: 1, width: 18 }, radioDot: { backgroundColor: "#1A73E8", borderRadius: 4, height: 8, width: 8 }, sourceTitle: { color: "#202124", fontFamily: type.semi, fontSize: 12 }, sourceBody: { color: "#5F6368", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 2 }, reminder: { alignItems: "center", backgroundColor: "#E8F0FE", borderRadius: 14, flexDirection: "row", gap: 10, marginTop: 3, padding: 13 }, reminderTitle: { color: "#174EA6", fontFamily: type.semi, fontSize: 12 }, reminderBody: { color: "#3C4043", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 3 }, notes: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 12, borderWidth: 1, color: "#202124", fontFamily: type.regular, fontSize: 12, lineHeight: 18, minHeight: 78, padding: 12 }, missing: { color: "#5F6368", fontFamily: type.regular }, discoverLink: { color: "#1A73E8", fontFamily: type.semi, marginTop: 10 }, pressed: { opacity: 0.75 } });

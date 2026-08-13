@@ -87,6 +87,17 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     [
+      "expo-font",
+      {
+        "fonts": [
+          "./assets/fonts/Poppins-Regular.ttf",
+          "./assets/fonts/Poppins-Medium.ttf",
+          "./assets/fonts/Poppins-SemiBold.ttf",
+          "./assets/fonts/Poppins-Bold.ttf"
+        ]
+      }
+    ],
+    [
       "expo-notifications",
       {
         "defaultChannel": "renewals",

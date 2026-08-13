@@ -4,22 +4,29 @@
 
 SubTrack is a **privacy-first subscription dashboard** for people who want a simple picture of their recurring services without connecting a bank account or inbox. It helps users discover services, add their real subscriptions manually, understand upcoming renewals, compare plan options, and open the correct official management page.
 
-The interface is designed for **portrait mobile screens (9:16)** and one-handed use. It follows mainstream iOS patterns: a clear large-title hierarchy, a familiar bottom tab bar, generous touch targets, grouped cards, modal sheets for focused tasks, visible back navigation, concise controls, and unobtrusive confirmation feedback.
+The interface is designed for **portrait mobile screens (9:16)** and one-handed use. It combines iOS-native interaction patterns with a **Google-inspired Material clarity**: a calm white canvas, restrained one-pixel dividers, spacious 8-point rhythm, softly rounded 16–24 px surfaces, clear hierarchy, readable navigation, and direct action labels. The experience must feel simple rather than decorative.
 
 ## Brand and visual direction
 
-The product should feel calm, competent, and financially responsible rather than aggressively “budgeting” focused. The visual language uses deep navy for trust, teal for active control and successful actions, pale mint for lightweight highlights, and warm amber for upcoming renewal attention.
+The product should feel calm, competent, and financially responsible rather than aggressively “budgeting” focused. The redesigned language uses Google-style blue as the primary action color, a white/soft-gray canvas, subtle neutral outlines, and limited semantic feedback colors. **Poppins is the only typeface** used for all interface text, with Regular for supporting information, Medium for controls, SemiBold for labels, and Bold only for high-level numeric and page hierarchy.
 
 | Role | Color | Usage |
 |---|---|---|
-| Ink | `#10253F` | Primary titles, tab labels, high-confidence text |
-| Canvas | `#F7F9FC` | Main screen background |
+| Ink | `#202124` | Primary titles, tab labels, high-confidence text |
+| Canvas | `#F8F9FA` | Main screen background |
 | Surface | `#FFFFFF` | Cards, sheets, input areas |
-| Teal | `#0E9F8A` | Primary action, active tab, confirmations |
-| Mint | `#DDF6EE` | Savings and positive-status highlights |
-| Amber | `#E59D2D` | Upcoming renewal and trial alerts |
-| Coral | `#D45757` | Delete and destructive action states |
-| Slate | `#667085` | Supporting copy and metadata |
+| Google Blue | `#1A73E8` | Primary actions, selected controls, active tab |
+| Blue Tint | `#E8F0FE` | Selected filters and low-emphasis blue surfaces |
+| Green | `#188038` | Positive status and active subscription state |
+| Amber | `#F9AB00` | Upcoming renewal and trial alerts |
+| Red | `#D93025` | Delete and destructive action states |
+| Slate | `#5F6368` | Supporting copy and metadata |
+
+## Redesign system
+
+The dashboard uses a simple document-like layout rather than dark hero cards or decorative gradients. The key financial number sits in a white summary surface with a crisp blue indicator and supporting text beneath it. Every list item is a clean outlined surface with an identifiable service mark, two lines of text, and a direct value. Filter chips use a single selected blue-tint state; empty states remain quiet and helpful.
+
+Navigation stays familiar and lightweight. Bottom navigation has plain iconography, a clear blue active label, and no extra visual chrome. Screens use short page titles, persistent search where relevant, large direct touch targets, and single-purpose primary buttons. Poppins weights are used intentionally so dense information remains highly scannable on a narrow portrait screen.
 
 ## Screen list
 

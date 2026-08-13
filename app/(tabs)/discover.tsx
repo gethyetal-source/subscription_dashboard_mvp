@@ -6,54 +6,18 @@ import { Pill, ServiceBadge } from "@/components/subscription-ui";
 import { categoryOrder, services } from "@/lib/catalog";
 import { ScreenContainer } from "@/components/screen-container";
 
+const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
+
 export default function DiscoverScreen() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<(typeof categoryOrder)[number]>("All");
-  const filtered = useMemo(() => services.filter((service) => {
-    const matchesCategory = category === "All" || service.category === category;
-    const value = `${service.name} ${service.category} ${service.description}`.toLowerCase();
-    return matchesCategory && value.includes(query.trim().toLowerCase());
-  }), [category, query]);
-
+  const filtered = useMemo(() => services.filter((service) => (category === "All" || service.category === category) && `${service.name} ${service.category} ${service.description}`.toLowerCase().includes(query.trim().toLowerCase())), [category, query]);
   return (
     <ScreenContainer className="px-5" containerClassName="bg-background">
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-        ListHeaderComponent={
-          <>
-            <Text style={styles.eyebrow}>CATALOG</Text>
-            <Text style={styles.title}>Discover subscriptions</Text>
-            <Text style={styles.subtitle}>Explore popular services, compare plan options, then record your actual subscription.</Text>
-            <View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput value={query} onChangeText={setQuery} placeholder="Search services" placeholderTextColor="#98A3B3" style={styles.searchInput} /></View>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={categoryOrder as unknown as string[]}
-              keyExtractor={(item) => item}
-              contentContainerStyle={styles.chips}
-              renderItem={({ item }) => {
-                const selected = category === item;
-                return <Pressable onPress={() => setCategory(item as (typeof categoryOrder)[number])} style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}><Text style={[styles.chipText, selected && styles.chipTextSelected]}>{item}</Text></Pressable>;
-              }}
-            />
-            <View style={styles.catalogHeader}><Text style={styles.catalogTitle}>{category === "All" ? "Popular services" : category}</Text><Text style={styles.count}>{filtered.length} services</Text></View>
-          </>
-        }
-        ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyTitle}>No services found</Text><Text style={styles.emptyBody}>Try a different service name or category.</Text></View>}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => router.push(`/service/${item.id}`)} style={({ pressed }) => [styles.serviceCard, pressed && styles.pressed]}>
-            <ServiceBadge serviceId={item.id} size="large" />
-            <View style={styles.serviceCopy}>
-              <Text style={styles.serviceName}>{item.name}</Text>
-              <Text style={styles.serviceDescription} numberOfLines={2}>{item.description}</Text>
-              <View style={styles.serviceFoot}><Pill label={item.category} tone="neutral" /><Text style={styles.planCount}>{item.plans.length} plan options</Text></View>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
-        )}
+      <FlatList data={filtered} keyExtractor={(item) => item.id} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}
+        ListHeaderComponent={<><Text style={styles.title}>Discover</Text><Text style={styles.subtitle}>Find services, compare plan choices, then add what you actually pay.</Text><View style={styles.search}><Text style={styles.searchIcon}>⌕</Text><TextInput value={query} onChangeText={setQuery} placeholder="Search services" placeholderTextColor="#80868B" style={styles.searchInput} /></View><FlatList horizontal showsHorizontalScrollIndicator={false} data={categoryOrder as unknown as string[]} keyExtractor={(item) => item} contentContainerStyle={styles.chips} renderItem={({ item }) => { const selected = category === item; return <Pressable onPress={() => setCategory(item as (typeof categoryOrder)[number])} style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}><Text style={[styles.chipText, selected && styles.chipTextSelected]}>{item}</Text></Pressable>; }} /><View style={styles.catalogRow}><Text style={styles.catalogTitle}>{category === "All" ? "All services" : category}</Text><Text style={styles.count}>{filtered.length} available</Text></View></>}
+        ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyTitle}>No matching services</Text><Text style={styles.emptyBody}>Try a broader search or a different category.</Text></View>}
+        renderItem={({ item }) => <Pressable onPress={() => router.push(`/service/${item.id}`)} style={({ pressed }) => [styles.serviceCard, pressed && styles.pressed]}><ServiceBadge serviceId={item.id} size="large" /><View style={styles.serviceCopy}><Text style={styles.serviceName}>{item.name}</Text><Text numberOfLines={2} style={styles.serviceDescription}>{item.description}</Text><View style={styles.serviceMeta}><Pill label={item.category} tone="neutral" /><Text style={styles.planCount}>{item.plans.length} plans</Text></View></View><Text style={styles.chevron}>›</Text></Pressable>}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
       />
     </ScreenContainer>
@@ -61,30 +25,10 @@ export default function DiscoverScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingTop: 14, paddingBottom: 26 },
-  eyebrow: { color: "#0E9F8A", fontSize: 11, fontWeight: "900", letterSpacing: 1.7 },
-  title: { color: "#10253F", fontSize: 27, fontWeight: "800", letterSpacing: -0.8, marginTop: 4 },
-  subtitle: { color: "#667085", fontSize: 13, lineHeight: 19, marginTop: 7, marginBottom: 18 },
-  searchBox: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#DDE4EC", height: 50, borderRadius: 15, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 8 },
-  searchIcon: { color: "#667085", fontSize: 24, lineHeight: 25 },
-  searchInput: { flex: 1, color: "#10253F", fontSize: 15, fontWeight: "600", height: "100%" },
-  chips: { paddingVertical: 16, gap: 8 },
-  chip: { paddingVertical: 9, paddingHorizontal: 13, borderRadius: 999, backgroundColor: "#EAF0F5" },
-  chipSelected: { backgroundColor: "#10253F" },
-  chipText: { color: "#526476", fontSize: 12, fontWeight: "800" },
-  chipTextSelected: { color: "#FFFFFF" },
-  catalogHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 },
-  catalogTitle: { color: "#10253F", fontSize: 17, fontWeight: "800" },
-  count: { color: "#667085", fontSize: 12, fontWeight: "600" },
-  serviceCard: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 14, flexDirection: "row", gap: 13, alignItems: "center", borderWidth: 1, borderColor: "#E6ECF2" },
-  serviceCopy: { flex: 1, minWidth: 0 },
-  serviceName: { color: "#10253F", fontSize: 16, fontWeight: "800" },
-  serviceDescription: { color: "#667085", fontSize: 12, lineHeight: 17, marginTop: 4 },
-  serviceFoot: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 9 },
-  planCount: { color: "#667085", fontSize: 11, fontWeight: "700" },
-  chevron: { color: "#98A3B3", fontSize: 28, fontWeight: "300" },
-  empty: { padding: 30, alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 18 },
-  emptyTitle: { color: "#10253F", fontSize: 16, fontWeight: "800" },
-  emptyBody: { color: "#667085", marginTop: 5, fontSize: 13 },
-  pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
+  content: { paddingBottom: 28, paddingTop: 16 }, title: { color: "#202124", fontFamily: type.bold, fontSize: 27, letterSpacing: -0.8 }, subtitle: { color: "#5F6368", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginBottom: 18, marginTop: 5 },
+  search: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 24, borderWidth: 1, flexDirection: "row", gap: 8, height: 48, paddingHorizontal: 15 }, searchIcon: { color: "#5F6368", fontFamily: type.regular, fontSize: 24, lineHeight: 24 }, searchInput: { color: "#202124", flex: 1, fontFamily: type.regular, fontSize: 14, height: "100%" },
+  chips: { gap: 8, paddingVertical: 16 }, chip: { backgroundColor: "#F1F3F4", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 }, chipSelected: { backgroundColor: "#E8F0FE" }, chipText: { color: "#3C4043", fontFamily: type.semi, fontSize: 11 }, chipTextSelected: { color: "#1967D2" },
+  catalogRow: { alignItems: "baseline", flexDirection: "row", justifyContent: "space-between", marginBottom: 11 }, catalogTitle: { color: "#202124", fontFamily: type.semi, fontSize: 17 }, count: { color: "#5F6368", fontFamily: type.regular, fontSize: 11 },
+  serviceCard: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 13, minHeight: 92, padding: 14 }, serviceCopy: { flex: 1, minWidth: 0 }, serviceName: { color: "#202124", fontFamily: type.semi, fontSize: 15 }, serviceDescription: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 3 }, serviceMeta: { alignItems: "center", flexDirection: "row", gap: 8, marginTop: 8 }, planCount: { color: "#5F6368", fontFamily: type.regular, fontSize: 10 }, chevron: { color: "#9AA0A6", fontFamily: type.regular, fontSize: 26 },
+  empty: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderStyle: "dashed", borderWidth: 1, padding: 30 }, emptyTitle: { color: "#202124", fontFamily: type.semi, fontSize: 15 }, emptyBody: { color: "#5F6368", fontFamily: type.regular, fontSize: 12, marginTop: 4 }, pressed: { opacity: 0.75 },
 });

@@ -16,4 +16,9 @@
 - [x] Update app configuration with final brand details
 - [x] Add unit tests for spending calculations, persistence, and billing-link resolution
 - [x] Validate core behavior through automated tests and TypeScript checks; browser preview testing is intentionally skipped for this mobile project
-- [ ] Create a final project checkpoint
+- [x] Create a final project checkpoint
+- [x] Redesign the interface with a clean Google-inspired mobile visual system
+- [x] Apply Poppins as the sole app typeface across the mobile MVP
+- [x] Simplify layout density, elevation, navigation, cards, and action states across every screen
+- [x] Validate the Google-inspired visual refactor through TypeScript and automated tests
+- [ ] Create a redesign checkpoint

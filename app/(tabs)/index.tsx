@@ -7,112 +7,41 @@ import { useSubscriptions } from "@/lib/subscription-store";
 import { formatCurrency, getUpcomingSubscriptions, totalAnnual, totalMonthly } from "@/lib/subscription-utils";
 import { ScreenContainer } from "@/components/screen-container";
 
+const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
+
 export default function HomeScreen() {
   const { isReady, subscriptions } = useSubscriptions();
   const upcoming = getUpcomingSubscriptions(subscriptions).slice(0, 3);
   const activeCount = subscriptions.filter((item) => item.status !== "cancelled").length;
 
-  if (!isReady) return <ScreenContainer><View style={styles.loading}><ActivityIndicator color="#0E9F8A" /></View></ScreenContainer>;
+  if (!isReady) return <ScreenContainer><View style={styles.loading}><ActivityIndicator color="#1A73E8" /></View></ScreenContainer>;
 
   return (
-    <ScreenContainer containerClassName="bg-background" className="px-5">
+    <ScreenContainer className="px-5" containerClassName="bg-background">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.topbar}>
-          <View>
-            <Text style={styles.eyebrow}>SUBTRACK</Text>
-            <Text style={styles.title}>Your subscriptions, clear.</Text>
-          </View>
-          <Pressable onPress={() => router.push("/(tabs)/discover")} style={({ pressed }) => [styles.addCircle, pressed && styles.pressed]}>
-            <Text style={styles.addGlyph}>+</Text>
-          </Pressable>
+        <View style={styles.header}><View><Text style={styles.brand}>SubTrack</Text><Text style={styles.headerCaption}>Your subscription overview</Text></View><Pressable onPress={() => router.push("/(tabs)/discover")} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}><Text style={styles.addText}>+</Text></Pressable></View>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryTop}><Text style={styles.summaryLabel}>MONTHLY SPEND</Text><Pill label={`${activeCount} active`} tone="teal" /></View>
+          <Text style={styles.summaryAmount}>{formatCurrency(totalMonthly(subscriptions))}</Text>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryFooter}><Text style={styles.summaryFooterLabel}>Annual estimate</Text><Text style={styles.summaryFooterValue}>{formatCurrency(totalAnnual(subscriptions))}</Text></View>
         </View>
-
-        <View style={styles.heroCard}>
-          <View style={styles.heroCardTop}>
-            <View>
-              <Text style={styles.heroLabel}>ESTIMATED MONTHLY</Text>
-              <Text style={styles.heroAmount}>{formatCurrency(totalMonthly(subscriptions))}</Text>
-            </View>
-            <Pill label={`${activeCount} active`} tone="teal" />
-          </View>
-          <View style={styles.heroDivider} />
-          <View style={styles.heroFooter}>
-            <Text style={styles.heroFooterText}>Estimated annual spend</Text>
-            <Text style={styles.heroFooterValue}>{formatCurrency(totalAnnual(subscriptions))}</Text>
-          </View>
-          <View style={styles.glowOne} /><View style={styles.glowTwo} />
+        <View style={styles.infoRow}><View style={styles.infoIcon}><Text style={styles.infoIconText}>✓</Text></View><View style={{ flex: 1 }}><Text style={styles.infoTitle}>Private by design</Text><Text style={styles.infoBody}>Your subscription list stays on this device. No bank or inbox access.</Text></View></View>
+        <View style={styles.section}><SectionLabel title="Upcoming" action={subscriptions.length ? "See all" : undefined} onAction={() => router.push("/(tabs)/subscriptions")} />
+          {upcoming.length ? <View style={styles.list}>{upcoming.map((item) => <SubscriptionRow key={item.id} item={item} onPress={() => router.push(`/subscription/${item.id}` as never)} />)}</View> : <EmptyState title="Start your subscription list" body="Add a service to see renewal dates, trial reminders, and a clear monthly total." />}
         </View>
-
-        <View style={styles.callout}>
-          <View style={styles.calloutDot}><Text style={styles.calloutDotText}>✓</Text></View>
-          <View style={styles.calloutCopy}>
-            <Text style={styles.calloutTitle}>Your data stays on this device</Text>
-            <Text style={styles.calloutBody}>No bank connection, inbox scan, or provider password is required.</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <SectionLabel title="Upcoming" action={subscriptions.length ? "View all" : undefined} onAction={() => router.push("/(tabs)/subscriptions")} />
-          {upcoming.length ? (
-            <View style={styles.listGap}>
-              {upcoming.map((item) => <SubscriptionRow key={item.id} item={item} onPress={() => router.push(`/subscription/${item.id}` as never)} />)}
-            </View>
-          ) : (
-            <EmptyState title="Nothing scheduled yet" body="Add a subscription to see renewals, trial deadlines, and your spending estimate." />
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <SectionLabel title="Explore popular services" action="Discover" onAction={() => router.push("/(tabs)/discover")} />
-          <View style={styles.quickGrid}>
-            {["chatgpt", "netflix", "spotify", "google-one"].map((serviceId) => {
-              const service = getService(serviceId)!;
-              return (
-                <Pressable key={serviceId} onPress={() => router.push(`/service/${serviceId}`)} style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}>
-                  <ServiceBadge serviceId={serviceId} size="small" />
-                  <Text style={styles.quickName} numberOfLines={1}>{service.name}</Text>
-                  <Text style={styles.quickCategory}>{service.category}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {!subscriptions.length ? <PrimaryButton label="Add your first subscription" onPress={() => router.push("/(tabs)/discover")} /> : null}
+        <View style={styles.section}><SectionLabel title="Popular services" action="Browse all" onAction={() => router.push("/(tabs)/discover")} /><View style={styles.services}>{["chatgpt", "netflix", "spotify", "google-one"].map((serviceId) => { const service = getService(serviceId)!; return <Pressable key={serviceId} onPress={() => router.push(`/service/${serviceId}`)} style={({ pressed }) => [styles.service, pressed && styles.pressed]}><ServiceBadge serviceId={serviceId} size="small" /><Text numberOfLines={1} style={styles.serviceName}>{service.name}</Text><Text style={styles.serviceCategory}>{service.category}</Text></Pressable>; })}</View></View>
+        {!subscriptions.length ? <PrimaryButton label="Add a subscription" onPress={() => router.push("/(tabs)/discover")} /> : null}
       </ScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, alignItems: "center", justifyContent: "center" },
-  content: { paddingTop: 14, paddingBottom: 28, gap: 22 },
-  topbar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  eyebrow: { color: "#0E9F8A", fontSize: 11, fontWeight: "900", letterSpacing: 1.7 },
-  title: { color: "#10253F", fontSize: 25, fontWeight: "800", letterSpacing: -0.7, marginTop: 4 },
-  addCircle: { width: 44, height: 44, borderRadius: 16, backgroundColor: "#10253F", justifyContent: "center", alignItems: "center" },
-  addGlyph: { color: "#FFFFFF", fontSize: 28, fontWeight: "300", lineHeight: 29 },
-  heroCard: { overflow: "hidden", backgroundColor: "#10253F", borderRadius: 24, padding: 21, minHeight: 166 },
-  heroCardTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", zIndex: 1 },
-  heroLabel: { color: "#A7C5D7", fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
-  heroAmount: { color: "#FFFFFF", fontSize: 36, fontWeight: "800", letterSpacing: -1.2, marginTop: 5 },
-  heroDivider: { height: 1, backgroundColor: "#31516E", marginTop: 18, zIndex: 1 },
-  heroFooter: { flexDirection: "row", justifyContent: "space-between", marginTop: 12, zIndex: 1 },
-  heroFooterText: { color: "#B5CFE0", fontSize: 12, fontWeight: "600" },
-  heroFooterValue: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
-  glowOne: { position: "absolute", height: 160, width: 160, borderRadius: 80, backgroundColor: "#0E9F8A", opacity: 0.22, right: -55, top: -65 },
-  glowTwo: { position: "absolute", height: 86, width: 86, borderRadius: 43, backgroundColor: "#E59D2D", opacity: 0.16, right: 48, bottom: -42 },
-  callout: { flexDirection: "row", alignItems: "flex-start", gap: 11, padding: 15, backgroundColor: "#EDF7F5", borderRadius: 18 },
-  calloutDot: { height: 23, width: 23, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#0E9F8A" },
-  calloutDotText: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
-  calloutCopy: { flex: 1 },
-  calloutTitle: { color: "#087B6C", fontSize: 13, fontWeight: "800" },
-  calloutBody: { color: "#3A6D66", fontSize: 12, lineHeight: 17, marginTop: 3 },
-  section: { gap: 2 },
-  listGap: { gap: 10 },
-  quickGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  quickCard: { width: "48.5%", backgroundColor: "#FFFFFF", padding: 13, borderRadius: 17, borderWidth: 1, borderColor: "#E6ECF2" },
-  quickName: { color: "#10253F", fontSize: 13, fontWeight: "800", marginTop: 9 },
-  quickCategory: { color: "#667085", fontSize: 11, fontWeight: "600", marginTop: 3 },
-  pressed: { opacity: 0.75, transform: [{ scale: 0.985 }] },
+  loading: { alignItems: "center", flex: 1, justifyContent: "center" }, content: { gap: 24, paddingBottom: 28, paddingTop: 14 },
+  header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, brand: { color: "#202124", fontFamily: type.bold, fontSize: 25, letterSpacing: -0.8 }, headerCaption: { color: "#5F6368", fontFamily: type.regular, fontSize: 12, marginTop: 2 },
+  addButton: { alignItems: "center", backgroundColor: "#E8F0FE", borderRadius: 22, height: 44, justifyContent: "center", width: 44 }, addText: { color: "#1A73E8", fontFamily: type.regular, fontSize: 28, lineHeight: 29 },
+  summaryCard: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, padding: 20 }, summaryTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, summaryLabel: { color: "#5F6368", fontFamily: type.semi, fontSize: 10, letterSpacing: 1 }, summaryAmount: { color: "#202124", fontFamily: type.bold, fontSize: 36, letterSpacing: -1.3, marginTop: 8 }, summaryDivider: { backgroundColor: "#E8EAED", height: 1, marginTop: 19 }, summaryFooter: { flexDirection: "row", justifyContent: "space-between", marginTop: 12 }, summaryFooterLabel: { color: "#5F6368", fontFamily: type.regular, fontSize: 12 }, summaryFooterValue: { color: "#202124", fontFamily: type.semi, fontSize: 12 },
+  infoRow: { alignItems: "flex-start", backgroundColor: "#F8F9FA", borderColor: "#E8EAED", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, padding: 13 }, infoIcon: { alignItems: "center", backgroundColor: "#E6F4EA", borderRadius: 12, height: 24, justifyContent: "center", width: 24 }, infoIconText: { color: "#188038", fontFamily: type.bold, fontSize: 12 }, infoTitle: { color: "#3C4043", fontFamily: type.semi, fontSize: 12 }, infoBody: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  section: {}, list: { gap: 10 }, services: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, service: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 14, borderWidth: 1, padding: 12, width: "48.5%" }, serviceName: { color: "#202124", fontFamily: type.semi, fontSize: 12, marginTop: 8 }, serviceCategory: { color: "#5F6368", fontFamily: type.regular, fontSize: 10, marginTop: 2 }, pressed: { opacity: 0.74, transform: [{ scale: 0.99 }] },
 });
