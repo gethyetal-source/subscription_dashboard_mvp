@@ -44,6 +44,10 @@
 - [x] Highlight matching provider and plan text in dashboard search results
 - [x] Add subscription category filters beside dashboard search
 - [x] Persist the selected dashboard sort order in local storage
-- [x] Validate personalization and filtering controls and save a checkpoint
+- [ ] Validate personalization and filtering controls and save a checkpoint
+- [x] Add subscription spend summary metrics and category breakdown calculations
+- [x] Add actionable spend insights based on saved subscriptions and upcoming charges
+- [x] Add a dashboard summary and insight presentation
+- [x] Validate spend calculations and save a summary-feature checkpoint
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
