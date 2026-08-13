@@ -24,3 +24,6 @@
 - [ ] Create a redesign checkpoint
 - [x] Fix preview startup loop that leaves the project marked as under modification
 - [x] Verify the stable Expo preview remains running after initial bundling
+- [x] Add a visual renewal calendar to the dashboard with date-linked upcoming charges
+- [x] Validate the renewal calendar with automated tests and TypeScript checks
+- [ ] Create a renewal-calendar checkpoint
