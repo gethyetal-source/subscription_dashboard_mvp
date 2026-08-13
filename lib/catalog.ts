@@ -7,10 +7,10 @@ export const serviceLogoSources: Record<string, string> = {
   chatgpt: "https://commons.wikimedia.org/wiki/Special:FilePath/ChatGPT_logo.svg",
   claude: "https://cdn.simpleicons.org/anthropic",
   netflix: "https://cdn.simpleicons.org/netflix",
-  "prime-video": "https://commons.wikimedia.org/wiki/Special:FilePath/Amazon_Prime_logo.svg",
+  "prime-video": "https://www.google.com/s2/favicons?domain=amazon.com&sz=128",
   spotify: "https://cdn.simpleicons.org/spotify",
   "youtube-premium": "https://cdn.simpleicons.org/youtube",
-  "microsoft-365": "https://cdn.simpleicons.org/microsoft",
+  "microsoft-365": "https://www.google.com/s2/favicons?domain=microsoft.com&sz=128",
   "google-one": "https://cdn.simpleicons.org/google",
   notion: "https://cdn.simpleicons.org/notion",
   "apple-music": "https://cdn.simpleicons.org/applemusic",
@@ -32,8 +32,8 @@ export const services: ServiceDefinition[] = [
     managementHint: "Sign in, then open Settings to review your plan and billing options.",
     plans: plans([
       { id: "free", name: "Free", priceLabel: "No subscription", summary: "Core everyday AI access.", features: ["General chat", "Basic access", "Personal use"] },
-      { id: "plus", name: "Plus", priceLabel: "See official pricing", summary: "Expanded access for frequent individual use.", features: ["Higher limits", "Priority access", "More tools"] },
-      { id: "pro", name: "Pro", priceLabel: "See official pricing", summary: "Higher-capacity access for power users.", features: ["Highest limits", "Advanced tools", "Priority access"] },
+      { id: "plus", name: "Plus", priceLabel: "US$20/month", summary: "Expanded access for frequent individual use.", features: ["Higher limits", "Priority access", "More tools"] },
+      { id: "pro", name: "Pro", priceLabel: "US$200/month", summary: "Higher-capacity access for power users.", features: ["Highest limits", "Advanced tools", "Priority access"] },
     ]),
   },
   {
@@ -48,8 +48,8 @@ export const services: ServiceDefinition[] = [
     managementHint: "Sign in, then open account settings to view plan and billing controls.",
     plans: plans([
       { id: "free", name: "Free", priceLabel: "No subscription", summary: "Try core AI capabilities.", features: ["Core chat", "Limited use", "Personal workspace"] },
-      { id: "pro", name: "Pro", priceLabel: "See official pricing", summary: "More capacity for regular work.", features: ["Higher usage", "Priority access", "More features"] },
-      { id: "max", name: "Max", priceLabel: "See official pricing", summary: "Expanded access for intensive usage.", features: ["High capacity", "Priority access", "Advanced usage"] },
+      { id: "pro", name: "Pro", priceLabel: "US$20/month", summary: "More capacity for regular work.", features: ["Higher usage", "Priority access", "More features"] },
+      { id: "max", name: "Max", priceLabel: "From US$100/month", summary: "Expanded access for intensive usage.", features: ["High capacity", "Priority access", "Advanced usage"] },
     ]),
   },
   {
@@ -79,9 +79,9 @@ export const services: ServiceDefinition[] = [
     managementUrl: "https://www.amazon.com/gp/primecentral",
     managementHint: "Sign in to Amazon and open Prime Membership to review your direct membership.",
     plans: plans([
-      { id: "monthly", name: "Monthly", priceLabel: "Varies by country", summary: "Flexible membership cadence.", features: ["Monthly billing", "Prime benefits", "Regional terms"] },
-      { id: "annual", name: "Annual", cadence: "yearly", priceLabel: "Varies by country", summary: "Annual membership cadence.", features: ["Annual billing", "Prime benefits", "Regional terms"] },
-      { id: "video", name: "Prime Video", priceLabel: "Varies by country", summary: "Video access may be offered separately in some regions.", features: ["Video access", "Regional catalog", "Optional channels"] },
+      { id: "monthly", name: "Monthly", priceLabel: "US$14.99/month", summary: "Flexible membership cadence.", features: ["Monthly billing", "Prime benefits", "Regional terms"] },
+      { id: "annual", name: "Annual", cadence: "yearly", priceLabel: "US$139/year", summary: "Annual membership cadence.", features: ["Annual billing", "Prime benefits", "Regional terms"] },
+      { id: "video", name: "Prime Video", priceLabel: "See official price", summary: "Video access may be offered separately in some regions.", features: ["Video access", "Regional catalog", "Optional channels"] },
     ]),
   },
   {
@@ -96,8 +96,8 @@ export const services: ServiceDefinition[] = [
     managementHint: "Sign in to review your plan. If billed by a partner, Spotify will identify that provider.",
     plans: plans([
       { id: "free", name: "Free", priceLabel: "No subscription", summary: "Ad-supported listening.", features: ["Ad-supported", "Core music access", "Mobile limits"] },
-      { id: "premium", name: "Premium Individual", priceLabel: "Varies by country", summary: "Ad-free listening for one account.", features: ["Ad-free", "Offline listening", "Individual account"] },
-      { id: "family", name: "Premium Family", priceLabel: "Varies by country", summary: "A household plan where available.", features: ["Multiple accounts", "Household plan", "Parental features"] },
+      { id: "premium", name: "Premium Individual", priceLabel: "US$12.99/month", summary: "Ad-free listening for one account.", features: ["Ad-free", "Offline listening", "Individual account"] },
+      { id: "family", name: "Premium Family", priceLabel: "US$21.99/month", summary: "A household plan where available.", features: ["Multiple accounts", "Household plan", "Parental features"] },
     ]),
   },
   {
@@ -111,9 +111,9 @@ export const services: ServiceDefinition[] = [
     managementUrl: "https://www.youtube.com/paid_memberships",
     managementHint: "Open paid memberships while signed in to review eligible plan controls.",
     plans: plans([
-      { id: "individual", name: "Individual", priceLabel: "Varies by country", summary: "Ad-free viewing for one person.", features: ["Ad-free viewing", "Background play", "Downloads"] },
-      { id: "family", name: "Family", priceLabel: "Varies by country", summary: "Shared household access where available.", features: ["Multiple members", "Household rules", "Regional availability"] },
-      { id: "student", name: "Student", priceLabel: "Eligibility required", summary: "Reduced-price plan for eligible students.", features: ["Student verification", "Individual access", "Regional availability"] },
+      { id: "individual", name: "Individual", priceLabel: "US$15.99/month", summary: "Ad-free viewing for one person.", features: ["Ad-free viewing", "Background play", "Downloads"] },
+      { id: "family", name: "Family", priceLabel: "US$26.99/month", summary: "Shared household access where available.", features: ["Multiple members", "Household rules", "Regional availability"] },
+      { id: "student", name: "Student", priceLabel: "US$8.99/month", summary: "Reduced-price plan for eligible students.", features: ["Student verification", "Individual access", "Regional availability"] },
     ]),
   },
   {
@@ -127,9 +127,9 @@ export const services: ServiceDefinition[] = [
     managementUrl: "https://account.microsoft.com/services",
     managementHint: "Sign in to Microsoft services to review a directly billed personal subscription.",
     plans: plans([
-      { id: "basic", name: "Basic", priceLabel: "Varies by country", summary: "Essential storage and productivity access.", features: ["Cloud storage", "Web apps", "Personal use"] },
-      { id: "personal", name: "Personal", priceLabel: "Varies by country", summary: "Full apps for one person.", features: ["Desktop apps", "Cloud storage", "Personal use"] },
-      { id: "family", name: "Family", priceLabel: "Varies by country", summary: "Shared access for a household.", features: ["Multiple people", "Desktop apps", "Shared storage"] },
+      { id: "basic", name: "Personal", priceLabel: "US$9.99/month", summary: "Full apps and cloud storage for one person.", features: ["Desktop apps", "Cloud storage", "Personal use"] },
+      { id: "personal", name: "Family", priceLabel: "US$12.99/month", summary: "Full apps and cloud storage for up to six people.", features: ["Multiple people", "Desktop apps", "Shared storage"] },
+      { id: "family", name: "Premium", priceLabel: "US$19.99/month", summary: "Expanded AI and family plan capabilities.", features: ["Multiple people", "Desktop apps", "AI features"] },
     ]),
   },
   {
@@ -143,9 +143,9 @@ export const services: ServiceDefinition[] = [
     managementUrl: "https://one.google.com/settings",
     managementHint: "Open Google One settings to review storage and membership controls.",
     plans: plans([
-      { id: "basic", name: "Basic storage", priceLabel: "Varies by country", summary: "Entry-level expanded storage.", features: ["Shared storage", "Google account", "Personal use"] },
-      { id: "premium", name: "Premium storage", priceLabel: "Varies by country", summary: "More storage and selected benefits.", features: ["More storage", "Member benefits", "Family sharing"] },
-      { id: "ai", name: "AI plan", priceLabel: "Varies by country", summary: "Selected AI benefits in eligible regions.", features: ["AI features", "Storage", "Regional availability"] },
+      { id: "basic", name: "Basic storage", priceLabel: "US$1.99/month", summary: "Entry-level expanded storage.", features: ["Shared storage", "Google account", "Personal use"] },
+      { id: "premium", name: "Standard storage", priceLabel: "US$2.99/month", summary: "More storage and selected benefits.", features: ["More storage", "Member benefits", "Family sharing"] },
+      { id: "ai", name: "Google AI Pro", priceLabel: "US$19.99/month", summary: "Selected AI benefits in eligible regions.", features: ["AI features", "Storage", "Regional availability"] },
     ]),
   },
   {
@@ -160,8 +160,8 @@ export const services: ServiceDefinition[] = [
     managementHint: "Open workspace settings to review subscription and billing options.",
     plans: plans([
       { id: "free", name: "Free", priceLabel: "No subscription", summary: "Core workspace for personal use.", features: ["Notes", "Pages", "Personal workspace"] },
-      { id: "plus", name: "Plus", priceLabel: "See official pricing", summary: "Expanded collaboration capabilities.", features: ["More collaboration", "Sharing", "Expanded history"] },
-      { id: "business", name: "Business", priceLabel: "See official pricing", summary: "Team-oriented controls and administration.", features: ["Admin controls", "Team workspace", "Advanced collaboration"] },
+      { id: "plus", name: "Plus", priceLabel: "US$10/member/month", summary: "Expanded collaboration capabilities.", features: ["More collaboration", "Sharing", "Expanded history"] },
+      { id: "business", name: "Business", priceLabel: "US$20/member/month", summary: "Team-oriented controls and administration.", features: ["Admin controls", "Team workspace", "Advanced collaboration"] },
     ]),
   },
   {
@@ -175,9 +175,9 @@ export const services: ServiceDefinition[] = [
     managementUrl: "https://account.apple.com/account/manage/section/subscriptions",
     managementHint: "Apple-billed plans are managed through Apple Account subscriptions.",
     plans: plans([
-      { id: "student", name: "Student", priceLabel: "Eligibility required", summary: "Individual music plan for eligible students.", features: ["Student eligibility", "Personal account", "Music library"] },
-      { id: "individual", name: "Individual", priceLabel: "Varies by country", summary: "Personal streaming subscription.", features: ["Ad-free music", "Offline downloads", "Personal library"] },
-      { id: "family", name: "Family", priceLabel: "Varies by country", summary: "Shared plan within an eligible family group.", features: ["Family group", "Multiple people", "Personal libraries"] },
+      { id: "student", name: "Student", priceLabel: "US$6.99/month", summary: "Individual music plan for eligible students.", features: ["Student eligibility", "Personal account", "Music library"] },
+      { id: "individual", name: "Individual", priceLabel: "US$11.99/month", summary: "Personal streaming subscription.", features: ["Ad-free music", "Offline downloads", "Personal library"] },
+      { id: "family", name: "Family", priceLabel: "US$19.99/month", summary: "Shared plan within an eligible family group.", features: ["Family group", "Multiple people", "Personal libraries"] },
     ]),
   },
   {
@@ -208,8 +208,8 @@ export const services: ServiceDefinition[] = [
     managementHint: "Sign in and review account settings or the original billing channel.",
     plans: plans([
       { id: "course", name: "Single course", priceLabel: "Varies by offering", summary: "Course-specific access.", features: ["Selected course", "Course schedule", "Certificate options"] },
-      { id: "plus-monthly", name: "Plus monthly", priceLabel: "Varies by country", summary: "Monthly learning membership.", features: ["Eligible catalog", "Monthly billing", "Learning paths"] },
-      { id: "plus-annual", name: "Plus annual", cadence: "yearly", priceLabel: "Varies by country", summary: "Annual learning membership.", features: ["Eligible catalog", "Annual billing", "Learning paths"] },
+      { id: "plus-monthly", name: "Plus monthly", priceLabel: "US$59/month", summary: "Monthly learning membership.", features: ["Eligible catalog", "Monthly billing", "Learning paths"] },
+      { id: "plus-annual", name: "Plus annual", cadence: "yearly", priceLabel: "US$399/year", summary: "Annual learning membership.", features: ["Eligible catalog", "Annual billing", "Learning paths"] },
     ]),
   },
   {

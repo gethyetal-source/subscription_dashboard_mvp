@@ -21,42 +21,49 @@
 - [x] Apply Poppins as the sole app typeface across the mobile MVP
 - [x] Simplify layout density, elevation, navigation, cards, and action states across every screen
 - [x] Validate the Google-inspired visual refactor through TypeScript and automated tests
-- [ ] Create a redesign checkpoint
+- [x] Create a redesign checkpoint
 - [x] Fix preview startup loop that leaves the project marked as under modification
 - [x] Verify the stable Expo preview remains running after initial bundling
 - [x] Add a visual renewal calendar to the dashboard with date-linked upcoming charges
 - [x] Validate the renewal calendar with automated tests and TypeScript checks
-- [ ] Create a renewal-calendar checkpoint
+- [x] Create a renewal-calendar checkpoint
 - [x] Remove the dashboard renewal calendar
 - [x] Replace letter badges with official provider logo assets
 - [x] Fix add-subscription plan selection so selected plans update and save correctly
 - [x] Validate logo rendering and the repaired plan-selection flow
-- [ ] Create an official-logos and plan-selection checkpoint
+- [x] Create an official-logos and plan-selection checkpoint
 - [x] Add a brief success confirmation after a subscription is saved
 - [x] Add dashboard sorting by highest cost and upcoming billing date
 - [x] Add direct dashboard edit and delete controls for subscriptions
 - [x] Validate the new dashboard interactions with automated tests and TypeScript checks
-- [ ] Create a dashboard-interactions checkpoint
+- [x] Create a dashboard-interactions checkpoint
 - [x] Add a dashboard search bar for provider and plan names
 - [x] Show clear no-match feedback without disturbing dashboard sorting or management controls
-- [ ] Validate dashboard search and save a search-feature checkpoint
+- [x] Validate dashboard search and save a search-feature checkpoint
 - [x] Add a persistent light/dark theme switch for the app
 - [x] Highlight matching provider and plan text in dashboard search results
 - [x] Add subscription category filters beside dashboard search
 - [x] Persist the selected dashboard sort order in local storage
-- [ ] Validate personalization and filtering controls and save a checkpoint
+- [x] Validate personalization and filtering controls and save a checkpoint
 - [x] Add subscription spend summary metrics and category breakdown calculations
 - [x] Add actionable spend insights based on saved subscriptions and upcoming charges
 - [x] Add a dashboard summary and insight presentation
-- [ ] Validate spend calculations and save a summary-feature checkpoint
+- [x] Validate spend calculations and save a summary-feature checkpoint
 - [x] Add a persistent monthly subscription budget and dashboard progress indicator
 - [x] Add a local month-over-month subscription spend trend chart
 - [x] Make insights open the most relevant subscription for editing
 - [x] Fix the dashboard delete-record action
-- [ ] Validate budget, trend, insight actions, and deletion flow and save a checkpoint
+- [x] Validate budget, trend, insight actions, and deletion flow and save a checkpoint
 - [x] Add an immediate deletion toast with an undo action
 - [x] Add a prominent over-budget warning state to the budget progress view
 - [x] Add a category-level breakdown to the projected spend trend
 - [x] Validate undo, warning, and category trend behavior and save a checkpoint
+- [x] Repair the delete action and verify local record removal and undo behavior
+- [x] Add mandatory-field indicators and inline validation to subscription entry
+- [x] Add calendar date selectors for renewal and trial-end dates
+- [x] Research and update catalog plan prices from official provider sources
+- [x] Verify and refresh provider logo assets across the catalog
+- [x] Repair dashboard search matching and category-filter interaction
+- [x] Validate deletion, form validation, dates, catalog data, logos, and search and save a checkpoint
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
