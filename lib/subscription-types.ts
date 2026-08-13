@@ -58,6 +58,7 @@ export interface AppSettings {
   reminderDays: number;
   notificationsEnabled: boolean;
   dashboardSort: DashboardSort;
+  monthlyBudget: number;
 }
 
 export interface SubscriptionDraft {

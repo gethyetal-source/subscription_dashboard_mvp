@@ -23,8 +23,9 @@ export type DashboardSort = "upcoming" | "highest-cost";
 export function sortDashboardSubscriptions(subscriptions: SubscriptionRecord[], sort: DashboardSort) { const active = subscriptions.filter((item) => item.status !== "cancelled"); return sort === "highest-cost" ? [...active].sort((a, b) => b.amount - a.amount) : getUpcomingSubscriptions(active); }
 
 export interface CategorySpend { category: ServiceCategory | "Other"; monthly: number; percentage: number; subscriptionCount: number; }
-export interface SpendInsight { id: "empty" | "concentration" | "renewals" | "trial" | "currency"; title: string; body: string; }
+export interface SpendInsight { id: "empty" | "concentration" | "renewals" | "trial" | "currency"; title: string; body: string; subscriptionId?: string; }
 export interface SpendSummary { monthly: number; annual: number; activeCount: number; currency: string; categories: CategorySpend[]; upcomingSevenDays: SubscriptionRecord[]; trials: SubscriptionRecord[]; insights: SpendInsight[]; }
+export interface MonthlyTrendPoint { label: string; amount: number; }
 
 export function getSpendSummary(subscriptions: SubscriptionRecord[], reference = new Date()): SpendSummary {
   const active = subscriptions.filter((item) => item.status !== "cancelled");
@@ -47,12 +48,40 @@ export function getSpendSummary(subscriptions: SubscriptionRecord[], reference =
     insights.push({ id: "empty", title: "Your summary will appear here", body: "Add subscriptions with their actual prices and renewal dates to see spend patterns and renewal reminders." });
   } else {
     const leadingCategory = categories[0];
-    if (leadingCategory && leadingCategory.percentage >= 40) insights.push({ id: "concentration", title: `${leadingCategory.category} leads your spend`, body: `${leadingCategory.percentage}% of your estimated monthly subscription spend is in this category.` });
-    if (upcomingSevenDays.length) insights.push({ id: "renewals", title: `${upcomingSevenDays.length} renewal${upcomingSevenDays.length === 1 ? "" : "s"} in the next 7 days`, body: "Review upcoming charges in your dashboard before their renewal dates." });
-    if (trials.length) insights.push({ id: "trial", title: `${trials.length} active trial${trials.length === 1 ? "" : "s"}`, body: "Check trial end dates so you can decide whether to continue before a paid renewal." });
+    const leadingRecord = leadingCategory ? active.find((item) => getService(item.serviceId)?.category === leadingCategory.category) : undefined;
+    if (leadingCategory && leadingCategory.percentage >= 40) insights.push({ id: "concentration", title: `${leadingCategory.category} leads your spend`, body: `${leadingCategory.percentage}% of your estimated monthly subscription spend is in this category.`, subscriptionId: leadingRecord?.id });
+    if (upcomingSevenDays.length) insights.push({ id: "renewals", title: `${upcomingSevenDays.length} renewal${upcomingSevenDays.length === 1 ? "" : "s"} in the next 7 days`, body: "Review upcoming charges in your dashboard before their renewal dates.", subscriptionId: upcomingSevenDays[0]?.id });
+    if (trials.length) insights.push({ id: "trial", title: `${trials.length} active trial${trials.length === 1 ? "" : "s"}`, body: "Check trial end dates so you can decide whether to continue before a paid renewal.", subscriptionId: trials[0]?.id });
     if (new Set(active.map((item) => item.currency)).size > 1) insights.push({ id: "currency", title: "Multiple currencies detected", body: "Monthly and annual totals combine saved amounts across currencies, so treat them as a directional estimate." });
   }
   return { monthly, annual, activeCount: active.length, currency, categories, upcomingSevenDays, trials, insights };
+}
+
+function addCadence(date: Date, cadence: BillingCadence) {
+  const next = new Date(date);
+  if (cadence === "weekly") next.setDate(next.getDate() + 7);
+  else next.setMonth(next.getMonth() + (cadence === "monthly" ? 1 : cadence === "quarterly" ? 3 : 12));
+  return next;
+}
+
+export function getMonthlySpendTrend(subscriptions: SubscriptionRecord[], reference = new Date(), months = 6): MonthlyTrendPoint[] {
+  const active = subscriptions.filter((item) => item.status !== "cancelled");
+  return Array.from({ length: months }, (_, index) => {
+    const monthStart = new Date(reference.getFullYear(), reference.getMonth() + index, 1);
+    const monthEnd = new Date(reference.getFullYear(), reference.getMonth() + index + 1, 1);
+    const amount = active.reduce((total, item) => {
+      let chargeDate = new Date(`${item.renewalDate}T00:00:00`);
+      let safety = 0;
+      while (chargeDate < monthStart && safety < 600) { chargeDate = addCadence(chargeDate, item.cadence); safety += 1; }
+      while (chargeDate < monthEnd && safety < 700) {
+        if (chargeDate >= monthStart) total += item.amount;
+        chargeDate = addCadence(chargeDate, item.cadence);
+        safety += 1;
+      }
+      return total;
+    }, 0);
+    return { label: new Intl.DateTimeFormat(undefined, { month: "short" }).format(monthStart), amount: Number(amount.toFixed(2)) };
+  });
 }
 
 export function resolveManagementUrl(subscription: SubscriptionRecord) { const billingMeta = billingSourceMeta[subscription.billingSource]; return billingMeta.url ?? getService(subscription.serviceId)?.managementUrl ?? getService(subscription.serviceId)?.officialUrl ?? "https://www.google.com/"; }

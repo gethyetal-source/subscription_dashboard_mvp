@@ -48,6 +48,11 @@
 - [x] Add subscription spend summary metrics and category breakdown calculations
 - [x] Add actionable spend insights based on saved subscriptions and upcoming charges
 - [x] Add a dashboard summary and insight presentation
-- [x] Validate spend calculations and save a summary-feature checkpoint
+- [ ] Validate spend calculations and save a summary-feature checkpoint
+- [x] Add a persistent monthly subscription budget and dashboard progress indicator
+- [x] Add a local month-over-month subscription spend trend chart
+- [x] Make insights open the most relevant subscription for editing
+- [x] Fix the dashboard delete-record action
+- [x] Validate budget, trend, insight actions, and deletion flow and save a checkpoint
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device

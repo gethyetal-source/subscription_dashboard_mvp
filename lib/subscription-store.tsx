@@ -15,6 +15,7 @@ const defaultSettings: AppSettings = {
   reminderDays: 3,
   notificationsEnabled: true,
   dashboardSort: "upcoming",
+  monthlyBudget: 0,
 };
 
 interface SubscriptionStoreValue {
@@ -131,6 +132,11 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
   const updateSettings = useCallback(
     async (patch: Partial<AppSettings>) => {
       const nextSettings = { ...settings, ...patch };
+      const shouldRefreshReminders = Object.prototype.hasOwnProperty.call(patch, "reminderDays") || Object.prototype.hasOwnProperty.call(patch, "notificationsEnabled");
+      if (!shouldRefreshReminders) {
+        await persist(subscriptions, nextSettings);
+        return;
+      }
       const refreshed = await Promise.all(
         subscriptions.map(async (item) => {
           await cancelRenewalReminder(item.reminderIdentifier);
