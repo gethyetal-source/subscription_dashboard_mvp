@@ -39,6 +39,11 @@
 - [ ] Create a dashboard-interactions checkpoint
 - [x] Add a dashboard search bar for provider and plan names
 - [x] Show clear no-match feedback without disturbing dashboard sorting or management controls
-- [x] Validate dashboard search and save a search-feature checkpoint
+- [ ] Validate dashboard search and save a search-feature checkpoint
+- [x] Add a persistent light/dark theme switch for the app
+- [x] Highlight matching provider and plan text in dashboard search results
+- [x] Add subscription category filters beside dashboard search
+- [x] Persist the selected dashboard sort order in local storage
+- [x] Validate personalization and filtering controls and save a checkpoint
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device

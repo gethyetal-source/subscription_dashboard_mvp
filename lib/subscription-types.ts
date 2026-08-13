@@ -11,6 +11,7 @@ export type ServiceCategory =
 export type BillingSource = "apple" | "google" | "provider" | "carrier" | "reseller" | "unknown";
 export type SubscriptionStatus = "active" | "trial" | "cancelled" | "uncertain";
 export type BillingCadence = "weekly" | "monthly" | "quarterly" | "yearly";
+export type DashboardSort = "upcoming" | "highest-cost";
 
 export interface CatalogPlan {
   id: string;
@@ -56,6 +57,7 @@ export interface SubscriptionRecord {
 export interface AppSettings {
   reminderDays: number;
   notificationsEnabled: boolean;
+  dashboardSort: DashboardSort;
 }
 
 export interface SubscriptionDraft {

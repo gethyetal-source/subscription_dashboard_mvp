@@ -14,6 +14,7 @@ interface StoredState {
 const defaultSettings: AppSettings = {
   reminderDays: 3,
   notificationsEnabled: true,
+  dashboardSort: "upcoming",
 };
 
 interface SubscriptionStoreValue {
