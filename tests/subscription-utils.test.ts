@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { annualAmount, getUpcomingSubscriptions, isValidDateString, monthlyAmount, resolveManagementUrl, totalAnnual, totalMonthly } from "../lib/subscription-utils";
+import { annualAmount, getUpcomingSubscriptions, isValidDateString, monthlyAmount, resolveManagementUrl, sortDashboardSubscriptions, totalAnnual, totalMonthly } from "../lib/subscription-utils";
 import type { SubscriptionRecord } from "../lib/subscription-types";
 
 const baseRecord: SubscriptionRecord = {
@@ -37,6 +37,14 @@ describe("subscription calculations", () => {
     const later = { ...baseRecord, id: "sub_later", renewalDate: "2026-12-01" };
     const earlier = { ...baseRecord, id: "sub_earlier", renewalDate: "2026-09-01" };
     expect(getUpcomingSubscriptions([later, earlier]).map((item) => item.id)).toEqual(["sub_earlier", "sub_later"]);
+  });
+
+  it("sorts active dashboard records by next billing date or normalized monthly cost", () => {
+    const later = { ...baseRecord, id: "sub_later", renewalDate: "2026-12-01", amount: 20 };
+    const earlier = { ...baseRecord, id: "sub_earlier", renewalDate: "2026-09-01", amount: 10 };
+    const annualHighCost = { ...baseRecord, id: "sub_annual", renewalDate: "2026-10-01", amount: 240, cadence: "yearly" as const };
+    expect(sortDashboardSubscriptions([later, earlier, annualHighCost], "upcoming").map((item) => item.id)).toEqual(["sub_earlier", "sub_annual", "sub_later"]);
+    expect(sortDashboardSubscriptions([later, earlier, annualHighCost], "highest-cost").map((item) => item.id)).toEqual(["sub_annual", "sub_later", "sub_earlier"]);
   });
 });
 

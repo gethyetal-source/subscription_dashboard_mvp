@@ -32,5 +32,10 @@
 - [x] Fix add-subscription plan selection so selected plans update and save correctly
 - [x] Validate logo rendering and the repaired plan-selection flow
 - [ ] Create an official-logos and plan-selection checkpoint
+- [x] Add a brief success confirmation after a subscription is saved
+- [x] Add dashboard sorting by highest cost and upcoming billing date
+- [x] Add direct dashboard edit and delete controls for subscriptions
+- [x] Validate the new dashboard interactions with automated tests and TypeScript checks
+- [ ] Create a dashboard-interactions checkpoint
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device

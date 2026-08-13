@@ -63,6 +63,16 @@ export function getUpcomingSubscriptions(subscriptions: SubscriptionRecord[]) {
     .sort((a, b) => new Date(`${a.renewalDate}T00:00:00`).getTime() - new Date(`${b.renewalDate}T00:00:00`).getTime());
 }
 
+export type DashboardSort = "upcoming" | "highest-cost";
+
+export function sortDashboardSubscriptions(subscriptions: SubscriptionRecord[], sort: DashboardSort) {
+  const active = subscriptions.filter((item) => item.status !== "cancelled");
+  if (sort === "highest-cost") {
+    return [...active].sort((a, b) => b.amount - a.amount);
+  }
+  return getUpcomingSubscriptions(active);
+}
+
 export function resolveManagementUrl(subscription: SubscriptionRecord) {
   const billingMeta = billingSourceMeta[subscription.billingSource];
   if (billingMeta.url) return billingMeta.url;
