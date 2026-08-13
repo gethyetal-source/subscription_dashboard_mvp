@@ -3,6 +3,22 @@ import type { BillingSource, CatalogPlan, ServiceDefinition } from "./subscripti
 const plans = (items: Array<Omit<CatalogPlan, "cadence"> & { cadence?: CatalogPlan["cadence"] }>) =>
   items.map((item) => ({ cadence: "monthly" as const, ...item }));
 
+export const serviceLogoSources: Record<string, string> = {
+  chatgpt: "https://commons.wikimedia.org/wiki/Special:FilePath/ChatGPT_logo.svg",
+  claude: "https://cdn.simpleicons.org/anthropic",
+  netflix: "https://cdn.simpleicons.org/netflix",
+  "prime-video": "https://commons.wikimedia.org/wiki/Special:FilePath/Amazon_Prime_logo.svg",
+  spotify: "https://cdn.simpleicons.org/spotify",
+  "youtube-premium": "https://cdn.simpleicons.org/youtube",
+  "microsoft-365": "https://cdn.simpleicons.org/microsoft",
+  "google-one": "https://cdn.simpleicons.org/google",
+  notion: "https://cdn.simpleicons.org/notion",
+  "apple-music": "https://cdn.simpleicons.org/applemusic",
+  headspace: "https://cdn.simpleicons.org/headspace",
+  coursera: "https://cdn.simpleicons.org/coursera",
+  "playstation-plus": "https://cdn.simpleicons.org/playstation",
+};
+
 export const services: ServiceDefinition[] = [
   {
     id: "chatgpt",

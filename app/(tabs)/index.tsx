@@ -2,7 +2,6 @@ import { router } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState, Pill, PrimaryButton, SectionLabel, ServiceBadge, SubscriptionRow } from "@/components/subscription-ui";
-import { RenewalCalendar } from "@/components/renewal-calendar";
 import { getService } from "@/lib/catalog";
 import { useSubscriptions } from "@/lib/subscription-store";
 import { formatCurrency, getUpcomingSubscriptions, totalAnnual, totalMonthly } from "@/lib/subscription-utils";
@@ -20,7 +19,6 @@ export default function HomeScreen() {
     <View style={styles.summaryCard}><View style={styles.summaryTop}><Text style={styles.summaryLabel}>MONTHLY SPEND</Text><Pill label={`${activeCount} active`} tone="teal" /></View><Text style={styles.summaryAmount}>{formatCurrency(totalMonthly(subscriptions))}</Text><View style={styles.summaryDivider} /><View style={styles.summaryFooter}><Text style={styles.summaryFooterLabel}>Annual estimate</Text><Text style={styles.summaryFooterValue}>{formatCurrency(totalAnnual(subscriptions))}</Text></View></View>
     <View style={styles.infoRow}><View style={styles.infoIcon}><Text style={styles.infoIconText}>✓</Text></View><View style={{ flex: 1 }}><Text style={styles.infoTitle}>Private by design</Text><Text style={styles.infoBody}>Your subscription list stays on this device. No bank or inbox access.</Text></View></View>
     <View style={styles.section}><SectionLabel title="Upcoming" action={subscriptions.length ? "See all" : undefined} onAction={() => router.push("/(tabs)/subscriptions")} />{upcoming.length ? <View style={styles.list}>{upcoming.map((item) => <SubscriptionRow key={item.id} item={item} onPress={() => router.push(`/subscription/${item.id}` as never)} />)}</View> : <EmptyState title="Start your subscription list" body="Add a service to see renewal dates, trial reminders, and a clear monthly total." />}</View>
-    <View style={styles.section}><RenewalCalendar subscriptions={subscriptions} /></View>
     <View style={styles.section}><SectionLabel title="Popular services" action="Browse all" onAction={() => router.push("/(tabs)/discover")} /><View style={styles.services}>{["chatgpt", "netflix", "spotify", "google-one"].map((serviceId) => { const service = getService(serviceId)!; return <Pressable key={serviceId} onPress={() => router.push(`/service/${serviceId}`)} style={({ pressed }) => [styles.service, pressed && styles.pressed]}><ServiceBadge serviceId={serviceId} size="small" /><Text numberOfLines={1} style={styles.serviceName}>{service.name}</Text><Text style={styles.serviceCategory}>{service.category}</Text></Pressable>; })}</View></View>
     {!subscriptions.length ? <PrimaryButton label="Add a subscription" onPress={() => router.push("/(tabs)/discover")} /> : null}
   </ScrollView></ScreenContainer>;

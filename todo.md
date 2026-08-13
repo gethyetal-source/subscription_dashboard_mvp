@@ -27,3 +27,8 @@
 - [x] Add a visual renewal calendar to the dashboard with date-linked upcoming charges
 - [x] Validate the renewal calendar with automated tests and TypeScript checks
 - [ ] Create a renewal-calendar checkpoint
+- [x] Remove the dashboard renewal calendar
+- [x] Replace letter badges with official provider logo assets
+- [x] Fix add-subscription plan selection so selected plans update and save correctly
+- [x] Validate logo rendering and the repaired plan-selection flow
+- [ ] Create an official-logos and plan-selection checkpoint

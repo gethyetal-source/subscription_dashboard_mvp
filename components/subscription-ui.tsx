@@ -1,6 +1,9 @@
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 
-import { getService } from "@/lib/catalog";
+import { Image } from "expo-image";
+import { useState } from "react";
+
+import { getService, serviceLogoSources } from "@/lib/catalog";
 import type { SubscriptionRecord } from "@/lib/subscription-types";
 import { formatCurrency, formatRelativeRenewal } from "@/lib/subscription-utils";
 
@@ -13,11 +16,13 @@ const type = {
 
 export function ServiceBadge({ serviceId, size = "regular" }: { serviceId: string; size?: "small" | "regular" | "large" }) {
   const service = getService(serviceId);
+  const [failed, setFailed] = useState(false);
   const dimension = size === "small" ? 36 : size === "large" ? 54 : 42;
   const labelSize = size === "small" ? 11 : size === "large" ? 16 : 13;
+  const logoSource = serviceLogoSources[serviceId];
   return (
-    <View style={[styles.badge, { width: dimension, height: dimension, borderRadius: dimension / 2, backgroundColor: service?.accent ?? "#1A73E8" }]}>
-      <Text style={[styles.badgeText, { fontSize: labelSize }]}>{service?.initials ?? "?"}</Text>
+    <View style={[styles.badge, { width: dimension, height: dimension, borderRadius: dimension / 2 }]}> 
+      {logoSource && !failed ? <Image source={logoSource} contentFit="contain" transition={120} cachePolicy="disk" accessibilityLabel={`${service?.name ?? "Service"} logo`} style={{ width: dimension * 0.7, height: dimension * 0.7 }} onError={() => setFailed(true)} /> : <View style={[styles.fallbackBadge, { width: dimension, height: dimension, borderRadius: dimension / 2, backgroundColor: service?.accent ?? "#1A73E8" }]}><Text style={[styles.badgeText, { fontSize: labelSize }]}>{service?.initials ?? "?"}</Text></View>}
     </View>
   );
 }
@@ -58,7 +63,8 @@ export function EmptyState({ title, body }: { title: string; body: string }) {
 }
 
 const styles = StyleSheet.create({
-  badge: { alignItems: "center", justifyContent: "center" },
+  badge: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#E8EAED", borderWidth: 1, justifyContent: "center", overflow: "hidden" },
+  fallbackBadge: { alignItems: "center", justifyContent: "center" },
   badgeText: { color: "#FFFFFF", fontFamily: type.bold },
   pill: { alignSelf: "flex-start", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   pillLabel: { fontFamily: type.semi, fontSize: 10, textTransform: "capitalize" },
