@@ -37,5 +37,8 @@
 - [x] Add direct dashboard edit and delete controls for subscriptions
 - [x] Validate the new dashboard interactions with automated tests and TypeScript checks
 - [ ] Create a dashboard-interactions checkpoint
+- [x] Add a dashboard search bar for provider and plan names
+- [x] Show clear no-match feedback without disturbing dashboard sorting or management controls
+- [x] Validate dashboard search and save a search-feature checkpoint
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
