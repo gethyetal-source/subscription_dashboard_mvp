@@ -26,6 +26,7 @@ export interface CategorySpend { category: ServiceCategory | "Other"; monthly: n
 export interface SpendInsight { id: "empty" | "concentration" | "renewals" | "trial" | "currency"; title: string; body: string; subscriptionId?: string; }
 export interface SpendSummary { monthly: number; annual: number; activeCount: number; currency: string; categories: CategorySpend[]; upcomingSevenDays: SubscriptionRecord[]; trials: SubscriptionRecord[]; insights: SpendInsight[]; }
 export interface MonthlyTrendPoint { label: string; amount: number; }
+export interface CategoryTrend { category: ServiceCategory | "Other"; points: MonthlyTrendPoint[]; }
 
 export function getSpendSummary(subscriptions: SubscriptionRecord[], reference = new Date()): SpendSummary {
   const active = subscriptions.filter((item) => item.status !== "cancelled");
@@ -82,6 +83,14 @@ export function getMonthlySpendTrend(subscriptions: SubscriptionRecord[], refere
     }, 0);
     return { label: new Intl.DateTimeFormat(undefined, { month: "short" }).format(monthStart), amount: Number(amount.toFixed(2)) };
   });
+}
+
+export function getCategorySpendTrend(subscriptions: SubscriptionRecord[], reference = new Date(), months = 6): CategoryTrend[] {
+  const categories = Array.from(new Set(subscriptions.filter((item) => item.status !== "cancelled").map((item) => getService(item.serviceId)?.category ?? "Other")));
+  return categories.map((category) => ({
+    category: category as ServiceCategory | "Other",
+    points: getMonthlySpendTrend(subscriptions.filter((item) => (getService(item.serviceId)?.category ?? "Other") === category), reference, months),
+  }));
 }
 
 export function resolveManagementUrl(subscription: SubscriptionRecord) { const billingMeta = billingSourceMeta[subscription.billingSource]; return billingMeta.url ?? getService(subscription.serviceId)?.managementUrl ?? getService(subscription.serviceId)?.officialUrl ?? "https://www.google.com/"; }

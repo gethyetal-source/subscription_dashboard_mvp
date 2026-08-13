@@ -53,6 +53,10 @@
 - [x] Add a local month-over-month subscription spend trend chart
 - [x] Make insights open the most relevant subscription for editing
 - [x] Fix the dashboard delete-record action
-- [x] Validate budget, trend, insight actions, and deletion flow and save a checkpoint
+- [ ] Validate budget, trend, insight actions, and deletion flow and save a checkpoint
+- [x] Add an immediate deletion toast with an undo action
+- [x] Add a prominent over-budget warning state to the budget progress view
+- [x] Add a category-level breakdown to the projected spend trend
+- [x] Validate undo, warning, and category trend behavior and save a checkpoint
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device
 - [x] Ensure the dashboard exits local-data loading reliably in the web preview and on device

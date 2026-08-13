@@ -26,6 +26,7 @@ interface SubscriptionStoreValue {
   updateSubscription: (id: string, draft: SubscriptionDraft) => Promise<SubscriptionRecord | undefined>;
   updateStatus: (id: string, status: SubscriptionRecord["status"]) => Promise<void>;
   deleteSubscription: (id: string) => Promise<void>;
+  restoreSubscription: (record: SubscriptionRecord) => Promise<void>;
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
   resetLocalData: () => Promise<void>;
 }
@@ -129,6 +130,18 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
     [persist, settings, subscriptions],
   );
 
+  const restoreSubscription = useCallback(
+    async (record: SubscriptionRecord) => {
+      if (subscriptions.some((item) => item.id === record.id)) return;
+      let restored: SubscriptionRecord = { ...record, reminderIdentifier: undefined, updatedAt: new Date().toISOString() };
+      if (settings.notificationsEnabled && restored.reminderEnabled && restored.status !== "cancelled") {
+        restored = { ...restored, reminderIdentifier: await scheduleRenewalReminder(restored, settings.reminderDays) };
+      }
+      await persist([restored, ...subscriptions], settings);
+    },
+    [persist, settings, subscriptions],
+  );
+
   const updateSettings = useCallback(
     async (patch: Partial<AppSettings>) => {
       const nextSettings = { ...settings, ...patch };
@@ -160,8 +173,8 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
   }, [subscriptions]);
 
   const value = useMemo(
-    () => ({ isReady, subscriptions, settings, addSubscription, updateSubscription, updateStatus, deleteSubscription, updateSettings, resetLocalData }),
-    [addSubscription, deleteSubscription, isReady, resetLocalData, settings, subscriptions, updateSettings, updateStatus, updateSubscription],
+    () => ({ isReady, subscriptions, settings, addSubscription, updateSubscription, updateStatus, deleteSubscription, restoreSubscription, updateSettings, resetLocalData }),
+    [addSubscription, deleteSubscription, isReady, resetLocalData, restoreSubscription, settings, subscriptions, updateSettings, updateStatus, updateSubscription],
   );
 
   return <SubscriptionStore.Provider value={value}>{children}</SubscriptionStore.Provider>;
