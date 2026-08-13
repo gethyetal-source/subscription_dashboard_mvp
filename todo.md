@@ -22,3 +22,5 @@
 - [x] Simplify layout density, elevation, navigation, cards, and action states across every screen
 - [x] Validate the Google-inspired visual refactor through TypeScript and automated tests
 - [ ] Create a redesign checkpoint
+- [x] Fix preview startup loop that leaves the project marked as under modification
+- [x] Verify the stable Expo preview remains running after initial bundling
