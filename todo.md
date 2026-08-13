@@ -75,3 +75,5 @@
 - [x] Restart the development service after the reported preview interruption
 - [x] Resolve the previewer modification state and confirm the preview is available
 - [x] Document the Android APK release path and temporary free authentication and database options
+- [x] Configure an Expo web export and Vercel output directory to resolve the deployment failure
+- [x] Validate the Vercel-compatible static output and save a checkpoint
