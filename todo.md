@@ -79,3 +79,8 @@
 - [x] Validate the Vercel-compatible static output and save a checkpoint
 - [x] Verify the committed Vercel settings and resolve the repeated public-output error
 - [x] Remove the invalid Vercel framework field and validate the corrected static-export configuration
+- [x] Provide the step-by-step Vercel deployment procedure for the Expo static export
+- [x] Provide slow mobile-build status checks and escalation guidance
+- [x] Provide the Expo EAS setup and first Android APK build command
+- [x] Provide safe inspection and retry guidance for the Android build stalled at 1%
+- [x] Package remaining local project changes into a clean checkpoint
