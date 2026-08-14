@@ -84,3 +84,5 @@
 - [x] Provide the Expo EAS setup and first Android APK build command
 - [x] Provide safe inspection and retry guidance for the Android build stalled at 1%
 - [x] Package remaining local project changes into a clean checkpoint
+- [x] Create a repository README covering SubTrack setup, privacy, deployment, and Android builds
+- [x] Validate the README and save a documentation checkpoint
