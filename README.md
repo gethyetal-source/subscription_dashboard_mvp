@@ -7,6 +7,7 @@ SubTrack is a cross-platform Expo application for people who want a clear view o
 ## Contents
 
 - [Key capabilities](#key-capabilities)
+- [Screenshots](#screenshots)
 - [Privacy model](#privacy-model)
 - [Technology](#technology)
 - [Project structure](#project-structure)
@@ -26,6 +27,22 @@ SubTrack is a cross-platform Expo application for people who want a clear view o
 | **Fast management** | Quick-edit amount and renewal-date sheet, calendar date picker, required-field validation, and deletion controls restricted to the **Subscriptions** tab. |
 | **Provider handoff** | Open each provider’s official management page; SubTrack does not attempt provider-side cancellation. |
 | **Personalization** | Light/dark theme, Poppins typography, monthly budget, reminder lead time, and exported local data. |
+
+## Screenshots
+
+> The images below are intentionally labeled placeholders. Replace each file in `docs/screenshots/` with a current product screenshot while keeping the same filename, or update the image path in this section.
+
+### Dashboard
+
+![SubTrack dashboard screenshot placeholder](docs/screenshots/dashboard-placeholder.svg)
+
+### Service discovery
+
+![SubTrack discovery screenshot placeholder](docs/screenshots/discovery-placeholder.svg)
+
+### Subscription management
+
+![SubTrack subscription management screenshot placeholder](docs/screenshots/subscription-management-placeholder.svg)
 
 ## Privacy model
 

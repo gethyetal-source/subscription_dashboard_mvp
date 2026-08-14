@@ -86,3 +86,5 @@
 - [x] Package remaining local project changes into a clean checkpoint
 - [x] Create a repository README covering SubTrack setup, privacy, deployment, and Android builds
 - [x] Validate the README and save a documentation checkpoint
+- [x] Add labeled repository screenshot placeholders to the README
+- [x] Validate the README screenshot placeholders and save a checkpoint
