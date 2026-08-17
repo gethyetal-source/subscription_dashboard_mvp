@@ -91,3 +91,7 @@
 - [x] Define a cloud user-data architecture and migration path for authenticated subscription sync
 - [x] Document the prioritized next-stage SubTrack feature roadmap
 - [x] Keep cloud database work on hold and document a user-centered local-first feature catalogue
+- [x] Define local household members, shared-plan allocations, and contribution calculations
+- [x] Add a household management screen and member contribution view
+- [x] Add shared-plan assignment controls to subscription management
+- [x] Validate household calculations and save a feature checkpoint

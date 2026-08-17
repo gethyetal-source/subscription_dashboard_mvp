@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { annualAmount, getCategorySpendTrend, getMonthlySpendTrend, getSpendSummary, getUpcomingSubscriptions, isValidDateString, monthlyAmount, resolveManagementUrl, sortDashboardSubscriptions, totalAnnual, totalMonthly } from "../lib/subscription-utils";
-import type { SubscriptionRecord } from "../lib/subscription-types";
+import { annualAmount, getCategorySpendTrend, getHouseholdContributions, getMonthlySpendTrend, getSpendSummary, getUpcomingSubscriptions, isValidDateString, monthlyAmount, resolveManagementUrl, sortDashboardSubscriptions, totalAnnual, totalMonthly } from "../lib/subscription-utils";
+import type { HouseholdMember, SubscriptionRecord } from "../lib/subscription-types";
 
 const baseRecord: SubscriptionRecord = { id: "sub_1", serviceId: "chatgpt", planId: "plus", planName: "Plus", amount: 20, currency: "USD", cadence: "monthly", renewalDate: "2026-10-10", billingSource: "provider", status: "active", reminderEnabled: true, createdAt: "2026-08-13T00:00:00.000Z", updatedAt: "2026-08-13T00:00:00.000Z" };
+const householdMembers: HouseholdMember[] = [{ id: "owner", name: "You", color: "#1A73E8", isOwner: true, createdAt: "2026-08-13T00:00:00.000Z" }, { id: "alex", name: "Alex", color: "#188038", createdAt: "2026-08-13T00:00:00.000Z" }];
 
 describe("subscription calculations", () => {
   it("normalizes monthly, quarterly, and annual amounts", () => { expect(monthlyAmount(20, "monthly")).toBe(20); expect(monthlyAmount(30, "quarterly")).toBe(10); expect(monthlyAmount(120, "yearly")).toBe(10); expect(annualAmount(120, "yearly")).toBe(120); });
@@ -13,6 +14,7 @@ describe("subscription calculations", () => {
   it("summarizes monthly spend, category concentration, and near-term renewals", () => { const entertainment = { ...baseRecord, id: "sub_netflix", serviceId: "netflix", amount: 30, renewalDate: "2026-08-15" }; const summary = getSpendSummary([baseRecord, entertainment], new Date("2026-08-13T12:00:00")); expect(summary.monthly).toBe(50); expect(summary.categories[0]).toMatchObject({ category: "Entertainment", monthly: 30, percentage: 60 }); expect(summary.upcomingSevenDays.map((item) => item.id)).toEqual(["sub_netflix"]); expect(summary.insights.map((item) => item.id)).toContain("concentration"); expect(summary.insights.map((item) => item.id)).toContain("renewals"); });
   it("projects renewal charges into future monthly trend buckets", () => { const monthly = { ...baseRecord, renewalDate: "2026-08-15", amount: 12 }; const annual = { ...baseRecord, id: "sub_annual", renewalDate: "2026-09-01", amount: 120, cadence: "yearly" as const }; const trend = getMonthlySpendTrend([monthly, annual], new Date("2026-08-13T12:00:00"), 3); expect(trend).toEqual([{ label: "Aug", amount: 12 }, { label: "Sep", amount: 132 }, { label: "Oct", amount: 12 }]); });
   it("breaks the projected trend into service categories", () => { const ai = { ...baseRecord, renewalDate: "2026-08-15", amount: 20 }; const entertainment = { ...baseRecord, id: "sub_netflix", serviceId: "netflix", renewalDate: "2026-08-16", amount: 8 }; const categoryTrend = getCategorySpendTrend([ai, entertainment], new Date("2026-08-13T12:00:00"), 2); expect(categoryTrend.find((item) => item.category === "AI & work")?.points[0].amount).toBe(20); expect(categoryTrend.find((item) => item.category === "Entertainment")?.points[0].amount).toBe(8); });
+  it("splits shared plans equally while keeping individual plans with the device owner", () => { const shared = { ...baseRecord, amount: 24, sharedMemberIds: ["owner", "alex"] }; const individual = { ...baseRecord, id: "sub_individual", amount: 10, sharedMemberIds: ["owner"] }; const contributions = getHouseholdContributions([shared, individual], householdMembers); expect(contributions).toEqual([{ member: householdMembers[0], monthly: 22, sharedPlanCount: 2 }, { member: householdMembers[1], monthly: 12, sharedPlanCount: 1 }]); });
 });
 
 describe("subscription safety helpers", () => {

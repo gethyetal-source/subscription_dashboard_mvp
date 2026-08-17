@@ -13,6 +13,14 @@ export type SubscriptionStatus = "active" | "trial" | "cancelled" | "uncertain";
 export type BillingCadence = "weekly" | "monthly" | "quarterly" | "yearly";
 export type DashboardSort = "upcoming" | "highest-cost";
 
+export interface HouseholdMember {
+  id: string;
+  name: string;
+  color: string;
+  isOwner?: boolean;
+  createdAt: string;
+}
+
 export interface CatalogPlan {
   id: string;
   name: string;
@@ -50,6 +58,8 @@ export interface SubscriptionRecord {
   notes?: string;
   reminderEnabled: boolean;
   reminderIdentifier?: string;
+  /** Local household members who share this plan. The device owner is always included. */
+  sharedMemberIds?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -74,4 +84,5 @@ export interface SubscriptionDraft {
   status: SubscriptionStatus;
   notes?: string;
   reminderEnabled: boolean;
+  sharedMemberIds?: string[];
 }

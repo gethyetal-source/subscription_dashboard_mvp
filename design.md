@@ -39,6 +39,7 @@ Navigation stays familiar and lightweight. Bottom navigation has plain iconograp
 | My subscriptions | Active, trial, cancelled, and uncertain subscription lists; filters; spending totals; swipe-safe edit and archive actions. |
 | Add/edit subscription sheet | Service, plan, price, billing cadence, next renewal, trial end, billing source, and user note fields with save validation. |
 | Subscription detail | Personal record, spending estimate, renewal details, reminder setting, plan info, billing-source explanation, edit, mark-cancelled, and official-management action. |
+| Household | Local-only household members, per-person equal shared-plan contributions, and entry points to assign shared plans. No account, cloud sync, or cross-device sharing is implied. |
 | Official management sheet | A clear statement of who bills the user, what SubTrack can and cannot do, and a single action that opens an official provider, Apple, or Google destination. |
 | Settings | Reminder defaults, data export placeholder, privacy explanation, catalog feedback entry point, and local-data reset control. |
 
@@ -74,6 +75,14 @@ Navigation stays familiar and lightweight. Bottom navigation has plain iconograp
 2. The user taps **Compare plans**.
 3. The user reviews tier-by-tier cards with indicative pricing and concise differences.
 4. The user returns to add or edit their own actual subscription record.
+
+### Organize a shared household plan
+
+1. The user opens **Settings** and selects **Shared plans**.
+2. The user adds local household members such as a partner or family member.
+3. The user opens an existing subscription’s full edit screen and selects who shares it.
+4. The Household screen divides the saved monthly estimate equally between selected people.
+5. The user can remove a member locally; SubTrack removes that person from local shared-plan allocations without contacting any external service.
 
 ## Interaction principles
 

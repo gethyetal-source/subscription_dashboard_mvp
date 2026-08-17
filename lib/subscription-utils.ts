@@ -1,5 +1,5 @@
 import { billingSourceMeta, getService } from "./catalog";
-import type { BillingCadence, ServiceCategory, SubscriptionRecord } from "./subscription-types";
+import type { BillingCadence, HouseholdMember, ServiceCategory, SubscriptionRecord } from "./subscription-types";
 
 const cadenceMonths: Record<BillingCadence, number> = { weekly: 0.23, monthly: 1, quarterly: 3, yearly: 12 };
 
@@ -11,6 +11,37 @@ export function monthlyAmount(amount: number, cadence: BillingCadence) {
 export function annualAmount(amount: number, cadence: BillingCadence) { return Number((monthlyAmount(amount, cadence) * 12).toFixed(2)); }
 export function totalMonthly(subscriptions: SubscriptionRecord[]) { return Number(subscriptions.filter((item) => item.status !== "cancelled").reduce((sum, item) => sum + monthlyAmount(item.amount, item.cadence), 0).toFixed(2)); }
 export function totalAnnual(subscriptions: SubscriptionRecord[]) { return Number(subscriptions.filter((item) => item.status !== "cancelled").reduce((sum, item) => sum + annualAmount(item.amount, item.cadence), 0).toFixed(2)); }
+
+export interface HouseholdContribution {
+  member: HouseholdMember;
+  monthly: number;
+  sharedPlanCount: number;
+}
+
+/**
+ * Distributes each active subscription equally across its assigned local household members.
+ * Records without an assignment remain fully attributed to the device owner.
+ */
+export function getHouseholdContributions(subscriptions: SubscriptionRecord[], members: HouseholdMember[]): HouseholdContribution[] {
+  const memberIds = new Set(members.map((member) => member.id));
+  const totals = new Map(members.map((member) => [member.id, { monthly: 0, sharedPlanCount: 0 }]));
+  subscriptions.filter((item) => item.status !== "cancelled").forEach((item) => {
+    const assigned = Array.from(new Set((item.sharedMemberIds?.length ? item.sharedMemberIds : ["owner"]).filter((id) => memberIds.has(id))));
+    const participantIds = assigned.length ? assigned : [members[0]?.id].filter(Boolean) as string[];
+    if (!participantIds.length) return;
+    const share = monthlyAmount(item.amount, item.cadence) / participantIds.length;
+    participantIds.forEach((memberId) => {
+      const current = totals.get(memberId);
+      if (!current) return;
+      current.monthly += share;
+      current.sharedPlanCount += 1;
+    });
+  });
+  return members.map((member) => {
+    const total = totals.get(member.id) ?? { monthly: 0, sharedPlanCount: 0 };
+    return { member, monthly: Number(total.monthly.toFixed(2)), sharedPlanCount: total.sharedPlanCount };
+  });
+}
 
 export function startOfDay(date: Date) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
 export function daysUntil(dateValue: string, reference = new Date()) { return Math.ceil((startOfDay(new Date(`${dateValue}T00:00:00`)).getTime() - startOfDay(reference).getTime()) / 86_400_000); }
