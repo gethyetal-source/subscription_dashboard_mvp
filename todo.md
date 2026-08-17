@@ -100,3 +100,6 @@
 
 - [x] Implement trial countdown and renewal protection surfaces locally
 - [x] Validate trial countdown behavior and save a feature checkpoint
+
+- [x] Implement a local upcoming-charges timeline grouped by today, this week, and this month
+- [x] Validate the upcoming-charges timeline and save a feature checkpoint
