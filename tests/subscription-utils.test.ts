@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { annualAmount, getCategorySpendTrend, getHouseholdContributions, getMonthlySpendTrend, getSpendSummary, getUpcomingSubscriptions, isValidDateString, monthlyAmount, resolveManagementUrl, sortDashboardSubscriptions, totalAnnual, totalMonthly } from "../lib/subscription-utils";
+import { annualAmount, getCategorySpendTrend, getHouseholdContributions, getMonthlySpendTrend, getReviewQueue, getSavingsImpact, getSpendSummary, getUpcomingSubscriptions, isValidDateString, monthlyAmount, resolveManagementUrl, sortDashboardSubscriptions, totalAnnual, totalMonthly } from "../lib/subscription-utils";
 import type { HouseholdMember, SubscriptionRecord } from "../lib/subscription-types";
 
 const baseRecord: SubscriptionRecord = { id: "sub_1", serviceId: "chatgpt", planId: "plus", planName: "Plus", amount: 20, currency: "USD", cadence: "monthly", renewalDate: "2026-10-10", billingSource: "provider", status: "active", reminderEnabled: true, createdAt: "2026-08-13T00:00:00.000Z", updatedAt: "2026-08-13T00:00:00.000Z" };
@@ -17,6 +17,8 @@ describe("subscription calculations", () => {
   it("splits shared plans equally while keeping individual plans with the device owner", () => { const shared = { ...baseRecord, amount: 24, sharedMemberIds: ["owner", "alex"] }; const individual = { ...baseRecord, id: "sub_individual", amount: 10, sharedMemberIds: ["owner"] }; const contributions = getHouseholdContributions([shared, individual], householdMembers); expect(contributions).toEqual([{ member: householdMembers[0], monthly: 22, sharedPlanCount: 2 }, { member: householdMembers[1], monthly: 12, sharedPlanCount: 1 }]); });
   it("keeps the device owner in the split and ignores unknown member IDs", () => { const shared = { ...baseRecord, amount: 30, sharedMemberIds: ["alex", "missing", "alex"] }; const contributions = getHouseholdContributions([shared], householdMembers); expect(contributions).toEqual([{ member: householdMembers[0], monthly: 15, sharedPlanCount: 1 }, { member: householdMembers[1], monthly: 15, sharedPlanCount: 1 }]); });
   it("does not count cancelled shared plans in household contributions", () => { const cancelled = { ...baseRecord, amount: 100, status: "cancelled" as const, sharedMemberIds: ["owner", "alex"] }; const contributions = getHouseholdContributions([cancelled], householdMembers); expect(contributions).toEqual([{ member: householdMembers[0], monthly: 0, sharedPlanCount: 0 }, { member: householdMembers[1], monthly: 0, sharedPlanCount: 0 }]); });
+  it("builds an actionable review queue from trials, near renewals, and high costs", () => { const trial = { ...baseRecord, id: "sub_trial", status: "trial" as const, renewalDate: "2026-08-20" }; const queue = getReviewQueue([trial], new Date("2026-08-17T12:00:00")); expect(queue[0]?.reasons).toEqual(["trial", "renewal", "high-cost"]); });
+  it("calculates selected cancellation savings without counting cancelled records", () => { const yearly = { ...baseRecord, id: "sub_yearly", amount: 120, cadence: "yearly" as const }; const cancelled = { ...baseRecord, id: "sub_cancelled", amount: 50, status: "cancelled" as const }; expect(getSavingsImpact([yearly, cancelled], ["sub_yearly", "sub_cancelled"])).toEqual({ monthly: 10, annual: 120 }); });
 });
 
 describe("subscription safety helpers", () => {

@@ -53,6 +53,28 @@ export function getUpcomingSubscriptions(subscriptions: SubscriptionRecord[]) { 
 export type DashboardSort = "upcoming" | "highest-cost";
 export function sortDashboardSubscriptions(subscriptions: SubscriptionRecord[], sort: DashboardSort) { const active = subscriptions.filter((item) => item.status !== "cancelled"); return sort === "highest-cost" ? [...active].sort((a, b) => b.amount - a.amount) : getUpcomingSubscriptions(active); }
 
+export type ReviewReason = "trial" | "renewal" | "high-cost";
+export interface ReviewQueueItem { subscription: SubscriptionRecord; reasons: ReviewReason[]; monthly: number; annual: number; }
+
+export function getReviewQueue(subscriptions: SubscriptionRecord[], reference = new Date()): ReviewQueueItem[] {
+  const active = subscriptions.filter((item) => item.status !== "cancelled");
+  const costs = active.map((item) => monthlyAmount(item.amount, item.cadence)).sort((a, b) => b - a);
+  const highCostThreshold = costs.length > 2 ? costs[Math.min(2, costs.length - 1)] : costs[0] ?? 0;
+  return active.map((subscription) => {
+    const reasons: ReviewReason[] = [];
+    const renewalDays = daysUntil(subscription.renewalDate, reference);
+    if (subscription.status === "trial") reasons.push("trial");
+    if (renewalDays >= 0 && renewalDays <= 14) reasons.push("renewal");
+    if (monthlyAmount(subscription.amount, subscription.cadence) >= highCostThreshold && highCostThreshold > 0) reasons.push("high-cost");
+    return { subscription, reasons, monthly: monthlyAmount(subscription.amount, subscription.cadence), annual: annualAmount(subscription.amount, subscription.cadence) };
+  }).filter((item) => item.reasons.length > 0).sort((a, b) => b.reasons.length - a.reasons.length || b.monthly - a.monthly);
+}
+
+export function getSavingsImpact(subscriptions: SubscriptionRecord[], selectedIds: string[]) {
+  const selected = subscriptions.filter((item) => selectedIds.includes(item.id) && item.status !== "cancelled");
+  return { monthly: Number(selected.reduce((sum, item) => sum + monthlyAmount(item.amount, item.cadence), 0).toFixed(2)), annual: Number(selected.reduce((sum, item) => sum + annualAmount(item.amount, item.cadence), 0).toFixed(2)) };
+}
+
 export interface CategorySpend { category: ServiceCategory | "Other"; monthly: number; percentage: number; subscriptionCount: number; }
 export interface SpendInsight { id: "empty" | "concentration" | "renewals" | "trial" | "currency"; title: string; body: string; subscriptionId?: string; }
 export interface SpendSummary { monthly: number; annual: number; activeCount: number; currency: string; categories: CategorySpend[]; upcomingSevenDays: SubscriptionRecord[]; trials: SubscriptionRecord[]; insights: SpendInsight[]; }

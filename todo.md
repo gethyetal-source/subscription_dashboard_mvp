@@ -106,3 +106,19 @@
 
 - [x] Verify Family Add-on member assignment and subscription sharing end to end
 - [x] Add or update deterministic coverage for Family Add-on sharing behavior
+
+## Remaining local-first roadmap
+
+- [x] Add flexible reminder lead times and quiet-hour preferences
+- [x] Add selectable reminder lead times from 1 to 30 days
+- [x] Add subscription review queue with keep, review, and cancel-officially guidance
+- [x] Add savings simulator for monthly and annual cancellation impact
+- [ ] Add custom subscription creation for services outside the catalog
+- [ ] Add shared-plan badge and custom household split percentages
+- [x] Add calendar export for selected renewal dates
+- [ ] Add encrypted local backup and restore flow
+- [ ] Add optional biometric app lock where supported
+- [ ] Add subscription health or attention score
+- [ ] Add comprehensive deterministic tests for all new roadmap features
+- [x] Add deterministic tests for review queue and savings impact
+- [ ] Run complete project validation and save the roadmap checkpoint
