@@ -88,3 +88,5 @@
 - [x] Validate the README and save a documentation checkpoint
 - [x] Add labeled repository screenshot placeholders to the README
 - [x] Validate the README screenshot placeholders and save a checkpoint
+- [x] Define a cloud user-data architecture and migration path for authenticated subscription sync
+- [x] Document the prioritized next-stage SubTrack feature roadmap
