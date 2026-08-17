@@ -125,3 +125,5 @@
 - [x] Run complete project validation and save the roadmap checkpoint
 
 - [x] Implement custom household percentage allocations and validate the split calculations
+
+- [x] Keep the footer tab navigation available and functional throughout every primary app tab
