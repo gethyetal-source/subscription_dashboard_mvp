@@ -129,3 +129,5 @@
 - [x] Keep the footer tab navigation available and functional throughout every primary app tab
 
 - [x] Apply an electric royal-blue base and chartreuse/lime title system across the app
+
+- [x] Revamp the mobile UI and UX across the primary subscription-management flows

@@ -75,7 +75,7 @@ export default function SubscriptionsScreen() {
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      ListHeaderComponent={<><ElectricPageHeader title="Subscriptions" subtitle="Everything you track, in one place." trailing={<Pressable onPress={() => router.push("/(tabs)/discover")} style={({ pressed }) => [electric.addButton, pressed && styles.pressed]}><Text style={electric.addText}>Add</Text></Pressable>} /><View style={styles.filters}>{filters.map((item) => <Pressable key={item.value} onPress={() => setFilter(item.value)} style={({ pressed }) => [styles.filter, filter === item.value && styles.filterSelected, pressed && styles.pressed]}><Text style={[styles.filterText, filter === item.value && styles.filterTextSelected]}>{item.label}</Text></Pressable>)}</View></>}
+      ListHeaderComponent={<><ElectricPageHeader title="Subscriptions" subtitle="Everything you track, in one place." trailing={<Pressable accessibilityRole="button" accessibilityLabel="Add subscription" onPress={() => router.push("/(tabs)/discover")} style={({ pressed }) => [electric.addButton, pressed && styles.pressed]}><Text style={electric.addText}>Add</Text></Pressable>} /><View style={[styles.filters, revamp.filters]}>{filters.map((item) => <Pressable key={item.value} onPress={() => setFilter(item.value)} style={({ pressed }) => [styles.filter, filter === item.value && styles.filterSelected, filter === item.value && revamp.filterSelected, pressed && styles.pressed]}><Text style={[styles.filterText, filter === item.value && styles.filterTextSelected, filter === item.value && revamp.filterTextSelected]}>{item.label}</Text></Pressable>)}</View></>}
       ListEmptyComponent={<EmptyState title="No subscriptions here" body="Explore the catalog to add a plan, price, renewal date, and billing source." />}
       renderItem={({ item }) => <SubscriptionRow item={item} onPress={() => router.push(`/subscription/${item.id}` as never)} onQuickEdit={() => openQuickEdit(item)} onDelete={() => setDeleteCandidate(item)} />}
       ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -149,3 +149,5 @@ const styles = StyleSheet.create({
 });
 
 const electric = StyleSheet.create({ addButton: { alignItems: "center", backgroundColor: "#C6FF00", borderRadius: 18, justifyContent: "center", minHeight: 38, paddingHorizontal: 13 }, addText: { color: "#081C70", fontFamily: type.semi, fontSize: 12 } });
+
+const revamp = StyleSheet.create({ filters: { marginTop: 16 }, filterSelected: { backgroundColor: "#C6FF00", borderColor: "#C6FF00" }, filterTextSelected: { color: "#081C70" } });

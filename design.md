@@ -10,6 +10,20 @@ The interface is designed for **portrait mobile screens (9:16)** and one-handed 
 
 The product should feel calm, competent, and financially responsible rather than aggressively “budgeting” focused. The redesigned language uses Google-style blue as the primary action color, a white/soft-gray canvas, subtle neutral outlines, and limited semantic feedback colors. **Poppins is the only typeface** used for all interface text, with Regular for supporting information, Medium for controls, SemiBold for labels, and Bold only for high-level numeric and page hierarchy.
 
+## Electric blue and lime UX refresh
+
+The revised experience uses a **deep electric-blue canvas** as the persistent product environment, with quiet white data surfaces that make renewal, spend, and service information easy to scan. **Chartreuse/lime** is reserved for page titles, the active tab, key totals, and the highest-priority action. This creates a clearer visual hierarchy without using lime for long reading text on a white surface.
+
+The home screen follows a deliberate thumb-first sequence: understand total spend, review the next charge, then explore deeper tools. Primary tabs receive a compact blue header that combines the screen name, a one-line purpose statement, and any most-used action. Supporting controls use consistent 44 px minimum touch targets, selected chip states, and lower-contrast metadata. Long dashboards keep insights grouped by intent—review, plan, and discover—rather than presenting every analysis card as equal priority.
+
+| UX surface | Revised behavior | Visual treatment |
+|---|---|---|
+| Primary headers | Explain the current task and keep the main action within reach | Royal blue surface with chartreuse title and pale-blue supporting copy |
+| Spend snapshot | Make the monthly estimate the first financial decision point | Layered blue card, lime total, concise annual comparison |
+| Review actions | Put the next renewal or trial ahead of secondary analysis | One clear review card before charts and category detail |
+| Lists and catalog | Favor fast scanning and direct actions | High-contrast white cards, larger service mark, restrained metadata, 44 px interactions |
+| Navigation | Keep the four core destinations stable and recognizable | Persistent royal-blue footer with lime active state |
+
 | Role | Color | Usage |
 |---|---|---|
 | Ink | `#202124` | Primary titles, tab labels, high-confidence text |
