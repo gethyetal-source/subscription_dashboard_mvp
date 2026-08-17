@@ -26,7 +26,7 @@ export function getHouseholdContributions(subscriptions: SubscriptionRecord[], m
   const memberIds = new Set(members.map((member) => member.id));
   const totals = new Map(members.map((member) => [member.id, { monthly: 0, sharedPlanCount: 0 }]));
   subscriptions.filter((item) => item.status !== "cancelled").forEach((item) => {
-    const assigned = Array.from(new Set((item.sharedMemberIds?.length ? item.sharedMemberIds : ["owner"]).filter((id) => memberIds.has(id))));
+    const assigned = Array.from(new Set(["owner", ...(item.sharedMemberIds ?? [])])).filter((id) => memberIds.has(id));
     const participantIds = assigned.length ? assigned : [members[0]?.id].filter(Boolean) as string[];
     if (!participantIds.length) return;
     const share = monthlyAmount(item.amount, item.cadence) / participantIds.length;

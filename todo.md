@@ -103,3 +103,6 @@
 
 - [x] Implement a local upcoming-charges timeline grouped by today, this week, and this month
 - [x] Validate the upcoming-charges timeline and save a feature checkpoint
+
+- [x] Verify Family Add-on member assignment and subscription sharing end to end
+- [x] Add or update deterministic coverage for Family Add-on sharing behavior
