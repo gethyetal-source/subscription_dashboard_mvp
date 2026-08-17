@@ -70,6 +70,18 @@ export function getReviewQueue(subscriptions: SubscriptionRecord[], reference = 
   }).filter((item) => item.reasons.length > 0).sort((a, b) => b.reasons.length - a.reasons.length || b.monthly - a.monthly);
 }
 
+export function getAttentionScore(subscription: SubscriptionRecord, reference = new Date()) {
+  let score = 0;
+  if (subscription.status === "trial") score += 45;
+  const renewalDays = daysUntil(subscription.renewalDate, reference);
+  if (renewalDays >= 0 && renewalDays <= 7) score += 35;
+  else if (renewalDays >= 0 && renewalDays <= 30) score += 20;
+  const monthly = monthlyAmount(subscription.amount, subscription.cadence);
+  if (monthly >= 50) score += 20;
+  else if (monthly >= 20) score += 10;
+  return Math.min(100, score);
+}
+
 export function getSavingsImpact(subscriptions: SubscriptionRecord[], selectedIds: string[]) {
   const selected = subscriptions.filter((item) => selectedIds.includes(item.id) && item.status !== "cancelled");
   return { monthly: Number(selected.reduce((sum, item) => sum + monthlyAmount(item.amount, item.cadence), 0).toFixed(2)), annual: Number(selected.reduce((sum, item) => sum + annualAmount(item.amount, item.cadence), 0).toFixed(2)) };

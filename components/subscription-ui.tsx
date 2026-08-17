@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { getService, serviceLogoSources } from "@/lib/catalog";
 import type { SubscriptionRecord } from "@/lib/subscription-types";
-import { formatCurrency, formatRelativeRenewal } from "@/lib/subscription-utils";
+import { formatCurrency, formatRelativeRenewal, monthlyAmount } from "@/lib/subscription-utils";
 
 const type = {
   regular: "Poppins-Regular",
@@ -52,7 +52,7 @@ export function SubscriptionRow({ item, onPress, onQuickEdit, onDelete }: { item
     <View style={styles.subscriptionCard}>
       <Pressable onPress={onPress} style={({ pressed }) => [styles.subscriptionRow, pressed && styles.rowPressed]}>
         <ServiceBadge serviceId={item.serviceId} />
-        <View style={styles.subscriptionCopy}><Text style={styles.subscriptionName}>{service?.name ?? "Subscription"}</Text><Text style={styles.subscriptionMeta}>{item.planName} · {formatRelativeRenewal(item.renewalDate)}</Text></View>
+        <View style={styles.subscriptionCopy}><Text style={styles.subscriptionName}>{service?.name ?? "Subscription"}</Text><Text style={styles.subscriptionMeta}>{item.planName} · {formatRelativeRenewal(item.renewalDate)}</Text>{(item.sharedMemberIds?.length ?? 1) > 1 ? <Text style={styles.sharedHint}>Shared plan · {formatCurrency(monthlyAmount(item.amount, item.cadence) / (item.sharedMemberIds?.length ?? 1), item.currency)} each / month</Text> : null}</View>
         <View style={styles.subscriptionAmount}><Text style={styles.amount}>{formatCurrency(item.amount, item.currency)}</Text><Pill label={item.status} tone={tone} /></View>
         <Text style={styles.chevron}>›</Text>
       </Pressable>
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: "#1A73E8", fontFamily: type.semi, fontSize: 14 },
   buttonPressed: { opacity: 0.78, transform: [{ scale: 0.99 }] }, buttonDisabled: { backgroundColor: "#AECBFA" },
   subscriptionCard: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, overflow: "hidden" }, subscriptionRow: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 76, padding: 12 },
-  rowPressed: { backgroundColor: "#F8F9FA" }, subscriptionCopy: { flex: 1, minWidth: 0 }, subscriptionName: { color: "#202124", fontFamily: type.semi, fontSize: 14 }, subscriptionMeta: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, marginTop: 3 },
+  rowPressed: { backgroundColor: "#F8F9FA" }, subscriptionCopy: { flex: 1, minWidth: 0 }, subscriptionName: { color: "#202124", fontFamily: type.semi, fontSize: 14 }, subscriptionMeta: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, marginTop: 3 }, sharedHint: { color: "#1A73E8", fontFamily: type.semi, fontSize: 9, marginTop: 3 },
   subscriptionAmount: { alignItems: "flex-end", gap: 4 }, amount: { color: "#202124", fontFamily: type.semi, fontSize: 13 }, chevron: { color: "#9AA0A6", fontFamily: type.regular, fontSize: 24, lineHeight: 24 }, rowDivider: { backgroundColor: "#E8EAED", height: 1 }, rowActions: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 6, paddingVertical: 4 }, rowAction: { paddingHorizontal: 12, paddingVertical: 7 }, quickEditText: { color: "#1A73E8", fontFamily: type.semi, fontSize: 11 }, deleteText: { color: "#C5221F", fontFamily: type.semi, fontSize: 11 },
   emptyState: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderStyle: "dashed", borderWidth: 1, paddingHorizontal: 28, paddingVertical: 34 },
   emptySymbol: { alignItems: "center", backgroundColor: "#E8F0FE", borderRadius: 22, height: 44, justifyContent: "center", marginBottom: 12, width: 44 }, emptySymbolText: { color: "#1A73E8", fontFamily: type.regular, fontSize: 26, lineHeight: 28 },

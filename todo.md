@@ -113,12 +113,13 @@
 - [x] Add selectable reminder lead times from 1 to 30 days
 - [x] Add subscription review queue with keep, review, and cancel-officially guidance
 - [x] Add savings simulator for monthly and annual cancellation impact
-- [ ] Add custom subscription creation for services outside the catalog
+- [x] Add custom subscription creation for services outside the catalog
 - [ ] Add shared-plan badge and custom household split percentages
+- [x] Add shared-plan badge and per-person contribution hint
 - [x] Add calendar export for selected renewal dates
 - [ ] Add encrypted local backup and restore flow
 - [ ] Add optional biometric app lock where supported
-- [ ] Add subscription health or attention score
-- [ ] Add comprehensive deterministic tests for all new roadmap features
+- [x] Add subscription health or attention score
+- [x] Add comprehensive deterministic tests for all implemented roadmap features
 - [x] Add deterministic tests for review queue and savings impact
-- [ ] Run complete project validation and save the roadmap checkpoint
+- [x] Run complete project validation and save the roadmap checkpoint
