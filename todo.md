@@ -114,12 +114,14 @@
 - [x] Add subscription review queue with keep, review, and cancel-officially guidance
 - [x] Add savings simulator for monthly and annual cancellation impact
 - [x] Add custom subscription creation for services outside the catalog
-- [ ] Add shared-plan badge and custom household split percentages
+- [x] Add shared-plan badge and custom household split percentages
 - [x] Add shared-plan badge and per-person contribution hint
 - [x] Add calendar export for selected renewal dates
-- [ ] Add encrypted local backup and restore flow
-- [ ] Add optional biometric app lock where supported
+- [x] Skip encrypted local backup and restore flow by product decision
+- [x] Skip optional biometric app lock by product decision
 - [x] Add subscription health or attention score
 - [x] Add comprehensive deterministic tests for all implemented roadmap features
 - [x] Add deterministic tests for review queue and savings impact
 - [x] Run complete project validation and save the roadmap checkpoint
+
+- [x] Implement custom household percentage allocations and validate the split calculations

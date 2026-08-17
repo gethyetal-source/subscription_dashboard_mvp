@@ -60,6 +60,8 @@ export interface SubscriptionRecord {
   reminderIdentifier?: string;
   /** Local household members who share this plan. The device owner is always included. */
   sharedMemberIds?: string[];
+  /** Local percentage allocations for the assigned household members. Must total 100 when customized. */
+  sharedMemberShares?: Record<string, number>;
   createdAt: string;
   updatedAt: string;
 }
@@ -85,4 +87,5 @@ export interface SubscriptionDraft {
   notes?: string;
   reminderEnabled: boolean;
   sharedMemberIds?: string[];
+  sharedMemberShares?: Record<string, number>;
 }

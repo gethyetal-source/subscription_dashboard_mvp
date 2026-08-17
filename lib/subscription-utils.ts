@@ -18,8 +18,21 @@ export interface HouseholdContribution {
   sharedPlanCount: number;
 }
 
+export function getHouseholdAllocation(memberIds: string[], customShares?: Record<string, number>) {
+  const participants = Array.from(new Set(["owner", ...memberIds]));
+  const raw = participants.map((id) => Number(customShares?.[id] ?? 0));
+  const total = raw.reduce((sum, value) => sum + value, 0);
+  if (total > 0 && Math.abs(total - 100) < 0.01 && raw.every((value) => Number.isFinite(value) && value >= 0)) {
+    return Object.fromEntries(participants.map((id, index) => [id, raw[index]]));
+  }
+  const equal = Number((100 / participants.length).toFixed(2));
+  const allocation = Object.fromEntries(participants.map((id) => [id, equal]));
+  allocation.owner = Number((100 - Object.entries(allocation).filter(([id]) => id !== "owner").reduce((sum, [, value]) => sum + value, 0)).toFixed(2));
+  return allocation;
+}
+
 /**
- * Distributes each active subscription equally across its assigned local household members.
+ * Distributes each active subscription by its saved local household allocation, falling back to equal shares.
  * Records without an assignment remain fully attributed to the device owner.
  */
 export function getHouseholdContributions(subscriptions: SubscriptionRecord[], members: HouseholdMember[]): HouseholdContribution[] {
@@ -29,11 +42,12 @@ export function getHouseholdContributions(subscriptions: SubscriptionRecord[], m
     const assigned = Array.from(new Set(["owner", ...(item.sharedMemberIds ?? [])])).filter((id) => memberIds.has(id));
     const participantIds = assigned.length ? assigned : [members[0]?.id].filter(Boolean) as string[];
     if (!participantIds.length) return;
-    const share = monthlyAmount(item.amount, item.cadence) / participantIds.length;
+    const allocation = getHouseholdAllocation(participantIds, item.sharedMemberShares);
+    const monthly = monthlyAmount(item.amount, item.cadence);
     participantIds.forEach((memberId) => {
       const current = totals.get(memberId);
       if (!current) return;
-      current.monthly += share;
+      current.monthly += monthly * ((allocation[memberId] ?? 0) / 100);
       current.sharedPlanCount += 1;
     });
   });
