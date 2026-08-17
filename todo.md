@@ -95,3 +95,8 @@
 - [x] Add a household management screen and member contribution view
 - [x] Add shared-plan assignment controls to subscription management
 - [x] Validate household calculations and save a feature checkpoint
+
+- [x] Restart the development service and verify the preview responds after the household feature update
+
+- [x] Implement trial countdown and renewal protection surfaces locally
+- [x] Validate trial countdown behavior and save a feature checkpoint
