@@ -90,3 +90,4 @@
 - [x] Validate the README screenshot placeholders and save a checkpoint
 - [x] Define a cloud user-data architecture and migration path for authenticated subscription sync
 - [x] Document the prioritized next-stage SubTrack feature roadmap
+- [x] Keep cloud database work on hold and document a user-centered local-first feature catalogue
