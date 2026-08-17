@@ -131,3 +131,5 @@
 - [x] Apply an electric royal-blue base and chartreuse/lime title system across the app
 
 - [x] Revamp the mobile UI and UX across the primary subscription-management flows
+
+- [x] Verify and package any outstanding project changes for publication
