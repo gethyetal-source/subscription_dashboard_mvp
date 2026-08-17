@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { annualAmount, getAttentionScore, getCategorySpendTrend, getHouseholdAllocation, getHouseholdContributions, getMonthlySpendTrend, getReviewQueue, getSavingsImpact, getSpendSummary, getUpcomingSubscriptions, isValidDateString, monthlyAmount, resolveManagementUrl, sortDashboardSubscriptions, totalAnnual, totalMonthly } from "../lib/subscription-utils";
+import { annualAmount, getAttentionScore, getCategorySpendTrend, getHouseholdAllocation, getHouseholdContributions, getMonthlySpendTrend, getReviewQueue, getSavingsImpact, getSpendSummary, getUpcomingSubscriptions, isTodayOrFutureDate, isValidDateString, monthlyAmount, resolveManagementUrl, sortDashboardSubscriptions, totalAnnual, totalMonthly } from "../lib/subscription-utils";
 import type { HouseholdMember, SubscriptionRecord } from "../lib/subscription-types";
 
 const baseRecord: SubscriptionRecord = { id: "sub_1", serviceId: "chatgpt", planId: "plus", planName: "Plus", amount: 20, currency: "USD", cadence: "monthly", renewalDate: "2026-10-10", billingSource: "provider", status: "active", reminderEnabled: true, createdAt: "2026-08-13T00:00:00.000Z", updatedAt: "2026-08-13T00:00:00.000Z" };
@@ -26,5 +26,6 @@ describe("subscription calculations", () => {
 
 describe("subscription safety helpers", () => {
   it("accepts only real YYYY-MM-DD dates", () => { expect(isValidDateString("2026-09-15")).toBe(true); expect(isValidDateString("15-09-2026")).toBe(false); expect(isValidDateString("2026-02-31")).toBe(false); });
+  it("requires a renewal date to be today or later", () => { const reference = new Date("2026-08-17T12:00:00"); expect(isTodayOrFutureDate("2026-08-16", reference)).toBe(false); expect(isTodayOrFutureDate("2026-08-17", reference)).toBe(true); expect(isTodayOrFutureDate("2026-08-18", reference)).toBe(true); expect(isTodayOrFutureDate("not-a-date", reference)).toBe(false); });
   it("routes store-billed subscriptions to the correct official management authority", () => { expect(resolveManagementUrl({ ...baseRecord, billingSource: "apple" })).toContain("apple.com"); expect(resolveManagementUrl({ ...baseRecord, billingSource: "google" })).toContain("play.google.com"); expect(resolveManagementUrl(baseRecord)).toContain("chatgpt.com"); });
 });

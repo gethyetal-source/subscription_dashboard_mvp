@@ -6,6 +6,7 @@ import { useState } from "react";
 import { getService, serviceLogoSources } from "@/lib/catalog";
 import type { SubscriptionRecord } from "@/lib/subscription-types";
 import { formatCurrency, formatRelativeRenewal, monthlyAmount } from "@/lib/subscription-utils";
+import { useThemeContext } from "@/lib/theme-provider";
 
 const type = {
   regular: "Poppins-Regular",
@@ -34,7 +35,9 @@ export function Pill({ label, tone = "neutral" }: { label: string; tone?: "neutr
 }
 
 export function SectionLabel({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
-  return <View style={styles.sectionRow}><Text style={styles.sectionTitle}>{title}</Text>{action && onAction ? <Pressable hitSlop={10} onPress={onAction}><Text style={styles.sectionAction}>{action}</Text></Pressable> : null}</View>;
+  const { colorScheme } = useThemeContext();
+  const sectionTheme = colorScheme === "dark" ? sectionThemes.dark : sectionThemes.light;
+  return <View style={styles.sectionRow}><Text style={[styles.sectionTitle, sectionTheme.title]}>{title}</Text>{action && onAction ? <Pressable hitSlop={10} onPress={onAction}><Text style={[styles.sectionAction, sectionTheme.action]}>{action}</Text></Pressable> : null}</View>;
 }
 
 export function PrimaryButton({ label, onPress, style, disabled = false }: { label: string; onPress: () => void; style?: ViewStyle; disabled?: boolean }) {
@@ -88,3 +91,8 @@ const styles = StyleSheet.create({
   emptySymbol: { alignItems: "center", backgroundColor: "#E8F0FE", borderRadius: 22, height: 44, justifyContent: "center", marginBottom: 12, width: 44 }, emptySymbolText: { color: "#1A73E8", fontFamily: type.regular, fontSize: 26, lineHeight: 28 },
   emptyTitle: { color: "#202124", fontFamily: type.semi, fontSize: 15, textAlign: "center" }, emptyBody: { color: "#5F6368", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 6, maxWidth: 270, textAlign: "center" },
 });
+
+const sectionThemes = {
+  light: StyleSheet.create({ title: { color: "#1238D7" }, action: { color: "#1238D7" } }),
+  dark: StyleSheet.create({ title: { color: "#C6FF00" }, action: { color: "#C6FF00" } }),
+};

@@ -8,6 +8,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { ElectricPageHeader } from "@/components/electric-page-header";
 import { useSubscriptions } from "@/lib/subscription-store";
 import type { SubscriptionDraft, SubscriptionRecord, SubscriptionStatus } from "@/lib/subscription-types";
+import { isTodayOrFutureDate, localDateKey } from "@/lib/subscription-utils";
 
 const filters: Array<{ label: string; value: "all" | SubscriptionStatus }> = [{ label: "All", value: "all" }, { label: "Active", value: "active" }, { label: "Trials", value: "trial" }, { label: "Cancelled", value: "cancelled" }];
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
@@ -44,6 +45,10 @@ export default function SubscriptionsScreen() {
     const amount = Number.parseFloat(amountInput);
     if (!Number.isFinite(amount) || amount <= 0) {
       setAmountError("Enter an amount greater than 0.");
+      return;
+    }
+    if (!isTodayOrFutureDate(renewalDate)) {
+      setAmountError("Choose today or a future renewal date.");
       return;
     }
 
@@ -94,7 +99,7 @@ export default function SubscriptionsScreen() {
         </View>
       </View>
     </Modal>
-    <DatePickerSheet visible={showDatePicker} value={renewalDate} title="Select renewal date" onClose={() => setShowDatePicker(false)} onSelect={setRenewalDate} />
+    <DatePickerSheet visible={showDatePicker} value={renewalDate} minDate={localDateKey()} title="Select renewal date" onClose={() => setShowDatePicker(false)} onSelect={setRenewalDate} />
 
     <Modal visible={!!deleteCandidate} transparent animationType="fade" onRequestClose={() => !isDeleting && setDeleteCandidate(null)}>
       <View style={styles.modalBackdrop}>

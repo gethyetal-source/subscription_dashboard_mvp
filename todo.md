@@ -133,3 +133,7 @@
 - [x] Revamp the mobile UI and UX across the primary subscription-management flows
 
 - [x] Verify and package any outstanding project changes for publication
+
+- [x] Repair broken visual surfaces and make light/dark themes clearly distinct
+- [x] Prevent past dates from being selected as a subscription’s next renewal date
+- [x] Add regression coverage and validate the stabilization fixes
