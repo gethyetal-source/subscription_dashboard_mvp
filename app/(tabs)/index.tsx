@@ -1,111 +1,229 @@
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useMemo } from "react";
 import { router } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useMemo, useState } from "react";
 
-import { EmptyState, Pill, PrimaryButton, SectionLabel, ServiceBadge } from "@/components/subscription-ui";
-import { TrialProtectionCard } from "@/components/trial-protection-card";
-import { UpcomingChargesTimeline } from "@/components/upcoming-charges-timeline";
-import { categoryOrder, getService } from "@/lib/catalog";
-import { useSubscriptions } from "@/lib/subscription-store";
-import { formatCurrency, formatRelativeRenewal, getCategorySpendTrend, getMonthlySpendTrend, getSpendSummary, sortDashboardSubscriptions, totalAnnual, totalMonthly, type CategoryTrend, type DashboardSort } from "@/lib/subscription-utils";
-import type { ServiceCategory, SubscriptionRecord } from "@/lib/subscription-types";
+import { EmptyState, ServiceBadge } from "@/components/subscription-ui";
 import { ScreenContainer } from "@/components/screen-container";
-import { ElectricPageHeader } from "@/components/electric-page-header";
+import { getService } from "@/lib/catalog";
+import { useSubscriptions } from "@/lib/subscription-store";
+import { formatCurrency, formatRelativeRenewal, getSpendSummary, totalAnnual, totalMonthly } from "@/lib/subscription-utils";
+import type { SubscriptionRecord } from "@/lib/subscription-types";
+import { useThemeContext } from "@/lib/theme-provider";
 
-const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
-const sortOptions: Array<{ id: DashboardSort; label: string }> = [{ id: "upcoming", label: "Upcoming" }, { id: "highest-cost", label: "Highest cost" }];
-type CategoryFilter = "All" | ServiceCategory;
+const FONT = {
+  regular: "Poppins-Regular",
+  medium: "Poppins-Medium",
+  semi: "Poppins-SemiBold",
+  bold: "Poppins-Bold",
+};
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+const dayLabel = (dateString: string) => {
+  const date = new Date(`${dateString}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat(undefined, { day: "numeric" }).format(date);
+};
 
-function HighlightText({ text, query, style }: { text: string; query: string; style: object }) {
-  const value = query.trim();
-  if (!value) return <Text style={style}>{text}</Text>;
-  const matcher = new RegExp(`(${escapeRegExp(value)})`, "gi");
-  return <Text style={style}>{text.split(matcher).map((part, index) => part.toLowerCase() === value.toLowerCase() ? <Text key={`${part}-${index}`} style={styles.matchText}>{part}</Text> : part)}</Text>;
-}
+function CommandHeader({
+  isDark,
+  nextAction,
+  onReview,
+  onAdd,
+}: {
+  isDark: boolean;
+  nextAction?: SubscriptionRecord;
+  onReview: () => void;
+  onAdd: () => void;
+}) {
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
+  const service = nextAction ? getService(nextAction.serviceId) : undefined;
+  const actionTitle = nextAction?.status === "trial" ? "Your trial needs a decision" : "Your next charge is approaching";
+  const actionDetail = nextAction?.status === "trial" ? "Review before the trial converts to a paid plan." : nextAction ? `${formatRelativeRenewal(nextAction.renewalDate)} · ${formatCurrency(nextAction.amount, nextAction.currency)}` : "Add a subscription to begin tracking renewal dates.";
 
-const trendColors = ["#1A73E8", "#34A853", "#FBBC04", "#EA4335", "#9334E6"];
-
-function CategoryTrendBreakdown({ trend, currency, maxTrend }: { trend: CategoryTrend[]; currency: string; maxTrend: number }) {
-  if (!trend.length) return null;
-  const points = trend[0]?.points ?? [];
-  return <View style={interactionStyles.categoryTrendCard}><View style={interactionStyles.categoryTrendHeader}><View><Text style={interactionStyles.categoryTrendTitle}>Projected category mix</Text><Text style={interactionStyles.categoryTrendCaption}>Renewal charges split by category</Text></View><Text style={interactionStyles.categoryTrendRange}>Next 6 months</Text></View><View style={interactionStyles.categoryTrendBars}>{points.map((point, monthIndex) => <View key={`${point.label}-${monthIndex}`} style={interactionStyles.categoryTrendColumn}><View style={interactionStyles.categoryTrendTrack}>{trend.map((entry, categoryIndex) => { const amount = entry.points[monthIndex]?.amount ?? 0; return amount ? <View key={entry.category} style={[interactionStyles.categoryTrendSegment, { backgroundColor: trendColors[categoryIndex % trendColors.length], height: Math.max(3, Math.round((amount / maxTrend) * 58)) }]} /> : null; })}</View><Text style={interactionStyles.categoryTrendLabel}>{point.label}</Text></View>)}</View><View style={interactionStyles.legend}>{trend.slice(0, 5).map((entry, index) => <View key={entry.category} style={interactionStyles.legendItem}><View style={[interactionStyles.legendDot, { backgroundColor: trendColors[index % trendColors.length] }]} /><Text style={interactionStyles.legendText}>{entry.category}</Text></View>)}</View><Text style={interactionStyles.categoryTrendFootnote}>Amounts reflect scheduled renewals in {currency} using current subscription records.</Text></View>;
-}
-
-function DashboardSubscriptionCard({ item, onEdit, searchQuery }: { item: SubscriptionRecord; onEdit: () => void; searchQuery: string }) {
-  const service = getService(item.serviceId);
-  const tone = item.status === "trial" ? "amber" : item.status === "uncertain" ? "neutral" : "teal";
-  return <View style={styles.subscriptionCard}>
-    <Pressable onPress={() => router.push(`/subscription/${item.id}` as never)} style={({ pressed }) => [styles.subscriptionTop, pressed && styles.pressed]}><ServiceBadge serviceId={item.serviceId} /><View style={styles.subscriptionCopy}><HighlightText text={service?.name ?? "Subscription"} query={searchQuery} style={styles.subscriptionName} /><Text style={styles.subscriptionMeta}><HighlightText text={item.planName} query={searchQuery} style={styles.subscriptionMeta} /> · {formatRelativeRenewal(item.renewalDate)}</Text></View><View style={styles.subscriptionAmount}><Text style={styles.amount}>{formatCurrency(item.amount, item.currency)}</Text><Pill label={item.status} tone={tone} /></View></Pressable>
-    <View style={styles.cardDivider} />
-    <View style={styles.cardActions}><Pressable onPress={onEdit} style={({ pressed }) => [styles.editAction, pressed && styles.pressed]}><Text style={styles.editActionText}>Edit</Text></Pressable></View>
+  return <View style={styles.headerBlock}>
+    <View style={styles.topLine}>
+      <View>
+        <Text style={styles.eyebrow}>SUBTRACK / TODAY</Text>
+        <Text style={styles.headline}>{nextAction ? actionTitle : "A calmer view of what you pay for."}</Text>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Add a subscription" onPress={onAdd} style={({ pressed }) => [styles.addControl, pressed && styles.pressed]}>
+        <Text style={styles.addControlText}>+</Text>
+      </Pressable>
+    </View>
+    <Pressable accessibilityRole="button" disabled={!nextAction} onPress={onReview} style={({ pressed }) => [styles.actionCard, !nextAction && styles.actionCardInactive, pressed && nextAction && styles.pressed]}>
+      <View style={styles.actionRule} />
+      {nextAction ? <ServiceBadge serviceId={nextAction.serviceId} /> : <View style={styles.placeholderMark}><Text style={styles.placeholderMarkText}>+</Text></View>}
+      <View style={styles.actionCopy}>
+        <Text style={styles.actionKicker}>{nextAction?.status === "trial" ? "TRIAL CHECK" : "NEXT UP"}</Text>
+        <Text numberOfLines={1} style={styles.actionService}>{service?.name ?? "Start tracking"}</Text>
+        <Text numberOfLines={2} style={styles.actionDetail}>{actionDetail}</Text>
+      </View>
+      {nextAction ? <View style={styles.reviewButton}><Text style={styles.reviewButtonText}>Review</Text></View> : <View style={styles.reviewButton}><Text style={styles.reviewButtonText}>Add</Text></View>}
+    </Pressable>
   </View>;
 }
 
-export default function HomeScreen() {
-  const { isReady, subscriptions, settings, updateSettings } = useSubscriptions();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("All");
-  const spendSummary = useMemo(() => getSpendSummary(subscriptions), [subscriptions]);
-  const spendTrend = useMemo(() => getMonthlySpendTrend(subscriptions), [subscriptions]);
-  const categoryTrend = useMemo(() => getCategorySpendTrend(subscriptions), [subscriptions]);
-  const maxTrend = Math.max(1, settings.monthlyBudget, ...spendTrend.map((point) => point.amount));
-  const budgetProgress = settings.monthlyBudget ? Math.min(100, Math.round((spendSummary.monthly / settings.monthlyBudget) * 100)) : 0;
-  const isOverBudget = settings.monthlyBudget > 0 && spendSummary.monthly > settings.monthlyBudget;
-  const sortedSubscriptions = useMemo(() => sortDashboardSubscriptions(subscriptions, settings.dashboardSort), [settings.dashboardSort, subscriptions]);
-  const visibleSubscriptions = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return sortedSubscriptions.filter((item) => {
-      const service = getService(item.serviceId);
-      const matchesSearch = !query || `${service?.name ?? ""} ${item.planName}`.toLowerCase().includes(query);
-      const matchesCategory = categoryFilter === "All" || service?.category === categoryFilter;
-      return matchesSearch && matchesCategory;
-    });
-  }, [categoryFilter, searchQuery, sortedSubscriptions]);
-  const activeCount = subscriptions.filter((item) => item.status !== "cancelled").length;
-  const trialProtection = useMemo(() => {
-    const active = subscriptions.filter((item) => item.status !== "cancelled");
-    const trial = [...active].filter((item) => item.status === "trial" && item.trialEndDate).sort((a, b) => (a.trialEndDate ?? "").localeCompare(b.trialEndDate ?? ""))[0];
-    const renewal = [...active].sort((a, b) => a.renewalDate.localeCompare(b.renewalDate))[0];
-    return { trial, renewal };
-  }, [subscriptions]);
-
-  if (!isReady) return <ScreenContainer><View style={styles.loading}><ActivityIndicator color="#1A73E8" /></View></ScreenContainer>;
-  return <ScreenContainer className="px-5" containerClassName="bg-background"><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-    <ElectricPageHeader title="SubTrack" subtitle="Your subscription overview" trailing={<Pressable onPress={() => router.push("/(tabs)/discover")} style={({ pressed }) => [styles.addButton, electric.addButton, pressed && styles.pressed]}><Text style={[styles.addText, electric.addText]}>+</Text></Pressable>} />
-    <View style={[styles.summaryCard, revamp.summaryCard]}><View style={styles.summaryTop}><Text style={[styles.summaryLabel, revamp.summaryLabel]}>MONTHLY SPEND</Text><Pill label={`${activeCount} active`} tone="teal" /></View><Text style={[styles.summaryAmount, revamp.summaryAmount]}>{formatCurrency(totalMonthly(subscriptions))}</Text><View style={[styles.summaryDivider, revamp.summaryDivider]} /><View style={styles.summaryFooter}><Text style={[styles.summaryFooterLabel, revamp.summaryFooterLabel]}>Annual estimate</Text><Text style={[styles.summaryFooterValue, revamp.summaryFooterValue]}>{formatCurrency(totalAnnual(subscriptions))}</Text></View></View>
-    <View style={revamp.quickActionRow}><Pressable accessibilityRole="button" accessibilityLabel="Add a subscription" onPress={() => router.push("/(tabs)/discover")} style={({ pressed }) => [revamp.quickPrimary, pressed && styles.pressed]}><Text style={revamp.quickPrimaryText}>Add subscription</Text><Text style={revamp.quickPrimaryArrow}>+</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Open my subscriptions" onPress={() => router.push("/(tabs)/subscriptions")} style={({ pressed }) => [revamp.quickSecondary, pressed && styles.pressed]}><Text style={revamp.quickSecondaryText}>My plans</Text><Text style={revamp.quickSecondaryArrow}>›</Text></Pressable></View>
-    <View style={styles.section}><SectionLabel title="Spend summary" /><View style={styles.metricRow}><View style={styles.metricCard}><Text style={styles.metricValue}>{spendSummary.activeCount}</Text><Text style={styles.metricLabel}>Active plans</Text></View><View style={styles.metricCard}><Text style={styles.metricValue}>{spendSummary.upcomingSevenDays.length}</Text><Text style={styles.metricLabel}>Renewing in 7 days</Text></View><View style={styles.metricCard}><Text style={styles.metricValue}>{spendSummary.trials.length}</Text><Text style={styles.metricLabel}>Active trials</Text></View></View><TrialProtectionCard trial={trialProtection.trial} renewal={trialProtection.renewal} onOpen={(item) => router.push(`/subscription/edit?subscriptionId=${item.id}&serviceId=${item.serviceId}` as never)} /><UpcomingChargesTimeline subscriptions={subscriptions} onOpen={(item) => router.push(`/subscription/edit?subscriptionId=${item.id}&serviceId=${item.serviceId}` as never)} />{settings.monthlyBudget ? <View style={summaryStyles.budgetCard}><View style={summaryStyles.budgetTop}><View><Text style={summaryStyles.budgetTitle}>Monthly budget</Text><Text style={summaryStyles.budgetCaption}>{formatCurrency(spendSummary.monthly, spendSummary.currency)} of {formatCurrency(settings.monthlyBudget, spendSummary.currency)}</Text></View><Text style={[summaryStyles.budgetPercent, spendSummary.monthly > settings.monthlyBudget && summaryStyles.budgetPercentOver]}>{budgetProgress}%</Text></View><View style={summaryStyles.budgetTrack}><View style={[summaryStyles.budgetFill, spendSummary.monthly > settings.monthlyBudget && summaryStyles.budgetFillOver, { width: `${budgetProgress}%` }]} /></View><Text style={summaryStyles.budgetNote}>{spendSummary.monthly > settings.monthlyBudget ? `${formatCurrency(spendSummary.monthly - settings.monthlyBudget, spendSummary.currency)} over budget` : `${formatCurrency(settings.monthlyBudget - spendSummary.monthly, spendSummary.currency)} remaining this month`}</Text></View> : <Pressable onPress={() => router.push("/(tabs)/settings")} style={({ pressed }) => [summaryStyles.setBudgetCard, pressed && styles.pressed]}><Text style={summaryStyles.setBudgetTitle}>Set a monthly budget</Text><Text style={summaryStyles.setBudgetBody}>Track how close your subscriptions are to a monthly target.</Text></Pressable>}<View style={summaryStyles.trendCard}><View style={summaryStyles.trendHeader}><View><Text style={summaryStyles.trendTitle}>Projected spend trend</Text><Text style={summaryStyles.trendCaption}>Upcoming subscription renewals</Text></View><Text style={summaryStyles.trendRange}>Next 6 months</Text></View><View style={summaryStyles.trendBars}>{spendTrend.map((point) => <View key={point.label} style={summaryStyles.trendColumn}><Text style={summaryStyles.trendAmount}>{point.amount ? formatCurrency(point.amount, spendSummary.currency).replace(/\.00$/, "") : "–"}</Text><View style={summaryStyles.trendTrack}><View style={[summaryStyles.trendBar, { height: Math.max(4, Math.round((point.amount / maxTrend) * 58)) }]} /></View><Text style={summaryStyles.trendLabel}>{point.label}</Text></View>)}</View></View>{spendSummary.categories.length ? <View style={styles.breakdownCard}><View style={styles.breakdownHeader}><Text style={styles.breakdownTitle}>Monthly spend by category</Text><Text style={styles.breakdownCaption}>Estimated</Text></View>{spendSummary.categories.slice(0, 3).map((category) => <View key={category.category} style={styles.categorySpend}><View style={styles.categorySpendTop}><Text style={styles.categorySpendName}>{category.category}</Text><Text style={styles.categorySpendAmount}>{formatCurrency(category.monthly, spendSummary.currency)} · {category.percentage}%</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.max(5, category.percentage)}%` }]} /></View></View>)}</View> : null}<View style={styles.insightList}>{spendSummary.insights.slice(0, 3).map((insight) => <Pressable key={insight.id} disabled={!insight.subscriptionId} onPress={() => insight.subscriptionId ? router.push(`/subscription/edit?subscriptionId=${insight.subscriptionId}&serviceId=${subscriptions.find((item) => item.id === insight.subscriptionId)?.serviceId ?? ""}` as never) : undefined} style={({ pressed }) => [styles.insightCard, pressed && insight.subscriptionId && styles.pressed]}><View style={styles.insightIcon}><Text style={styles.insightIconText}>i</Text></View><View style={{ flex: 1 }}><Text style={styles.insightTitle}>{insight.title}</Text><Text style={styles.insightBody}>{insight.body}</Text>{insight.subscriptionId ? <Text style={summaryStyles.insightAction}>Open and edit subscription</Text> : null}</View></Pressable>)}</View></View>
-    <View style={styles.infoRow}><View style={styles.infoIcon}><Text style={styles.infoIconText}>✓</Text></View><View style={{ flex: 1 }}><Text style={styles.infoTitle}>Private by design</Text><Text style={styles.infoBody}>Your subscription list stays on this device. No bank or inbox access.</Text></View></View>
-    <View style={styles.section}><SectionLabel title="Your subscriptions" action={subscriptions.length ? "View all" : undefined} onAction={() => router.push("/(tabs)/subscriptions")} />{subscriptions.length ? <><View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="Search provider or plan" placeholderTextColor="#80868B" returnKeyType="done" style={styles.searchInput} />{searchQuery ? <Pressable onPress={() => setSearchQuery("")} hitSlop={8}><Text style={styles.clearSearch}>×</Text></Pressable> : null}</View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>{(categoryOrder as readonly CategoryFilter[]).map((category) => <Pressable key={category} onPress={() => setCategoryFilter(category)} style={({ pressed }) => [styles.categoryChip, categoryFilter === category && styles.categoryChipSelected, pressed && styles.pressed]}><Text style={[styles.categoryChipText, categoryFilter === category && styles.categoryChipTextSelected]}>{category}</Text></Pressable>)}</ScrollView><View style={styles.sortRow}>{sortOptions.map((option) => <Pressable key={option.id} onPress={() => void updateSettings({ dashboardSort: option.id })} style={({ pressed }) => [styles.sortChip, settings.dashboardSort === option.id && styles.sortChipSelected, pressed && styles.pressed]}><Text style={[styles.sortChipText, settings.dashboardSort === option.id && styles.sortChipTextSelected]}>{option.label}</Text></Pressable>)}</View></> : null}{visibleSubscriptions.length ? <View style={styles.list}>{visibleSubscriptions.map((item) => <DashboardSubscriptionCard key={item.id} item={item} searchQuery={searchQuery} onEdit={() => router.push(`/subscription/edit?subscriptionId=${item.id}&serviceId=${item.serviceId}` as never)} />)}</View> : <EmptyState title={searchQuery || categoryFilter !== "All" ? "No subscriptions found" : "Start your subscription list"} body={searchQuery ? `No saved subscription matches “${searchQuery.trim()}”.` : categoryFilter !== "All" ? `No saved subscriptions are in ${categoryFilter}.` : "Add a service to see renewal dates, trial reminders, and a clear monthly total."} />}</View>
-    <View style={styles.section}><SectionLabel title="Popular services" action="Browse all" onAction={() => router.push("/(tabs)/discover")} /><View style={styles.services}>{["chatgpt", "netflix", "spotify", "google-one"].map((serviceId) => { const service = getService(serviceId)!; return <Pressable key={serviceId} onPress={() => router.push(`/service/${serviceId}`)} style={({ pressed }) => [styles.service, pressed && styles.pressed]}><ServiceBadge serviceId={serviceId} size="small" /><Text numberOfLines={1} style={styles.serviceName}>{service.name}</Text><Text style={styles.serviceCategory}>{service.category}</Text></Pressable>; })}</View></View>
-    {!subscriptions.length ? <PrimaryButton label="Add a subscription" onPress={() => router.push("/(tabs)/discover")} /> : null}
-  </ScrollView></ScreenContainer>;
+function ChargeStrip({ items, currency, isDark }: { items: SubscriptionRecord[]; currency: string; isDark: boolean }) {
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
+  return <View style={styles.runRateBlock}>
+    <View style={styles.sectionHeadingRow}>
+      <View><Text style={styles.sectionKicker}>THIS MONTH</Text><Text style={styles.sectionHeading}>Scheduled charges</Text></View>
+      <Text style={styles.sectionMeta}>{items.length ? `${items.length} ahead` : "No dates yet"}</Text>
+    </View>
+    <FlatList
+      data={items}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={styles.chargeStrip}
+      renderItem={({ item, index }) => {
+        const service = getService(item.serviceId);
+        return <Pressable accessibilityRole="button" onPress={() => router.push(`/subscription/${item.id}` as never)} style={({ pressed }) => [styles.chargeToken, index === 0 && styles.chargeTokenFirst, pressed && styles.pressed]}>
+          <Text style={styles.chargeDay}>{dayLabel(item.renewalDate)}</Text>
+          <View style={styles.chargeDot} />
+          <Text numberOfLines={1} style={styles.chargeName}>{service?.name ?? item.planName}</Text>
+          <Text style={styles.chargeAmount}>{formatCurrency(item.amount, currency)}</Text>
+        </Pressable>;
+      }}
+      ListEmptyComponent={<Text style={styles.emptyChargeText}>Your upcoming renewals will appear here.</Text>}
+    />
+  </View>;
 }
 
-const summaryStyles = StyleSheet.create({ budgetCard: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, marginTop: 10, padding: 14 }, budgetTop: { alignItems: "flex-start", flexDirection: "row", justifyContent: "space-between" }, budgetTitle: { color: "#202124", fontFamily: type.semi, fontSize: 13 }, budgetCaption: { color: "#5F6368", fontFamily: type.regular, fontSize: 10, marginTop: 2 }, budgetPercent: { color: "#188038", fontFamily: type.bold, fontSize: 18 }, budgetPercentOver: { color: "#D93025" }, budgetTrack: { backgroundColor: "#E8EAED", borderRadius: 4, height: 8, marginTop: 12, overflow: "hidden" }, budgetFill: { backgroundColor: "#1A73E8", borderRadius: 4, height: 8 }, budgetFillOver: { backgroundColor: "#D93025" }, budgetNote: { color: "#5F6368", fontFamily: type.regular, fontSize: 10, marginTop: 7 }, setBudgetCard: { backgroundColor: "#E8F0FE", borderRadius: 16, marginTop: 10, padding: 14 }, setBudgetTitle: { color: "#174EA6", fontFamily: type.semi, fontSize: 13 }, setBudgetBody: { color: "#3C4043", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 3 }, trendCard: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, marginTop: 10, padding: 14 }, trendHeader: { alignItems: "flex-start", flexDirection: "row", justifyContent: "space-between" }, trendTitle: { color: "#202124", fontFamily: type.semi, fontSize: 13 }, trendCaption: { color: "#5F6368", fontFamily: type.regular, fontSize: 10, marginTop: 2 }, trendRange: { color: "#5F6368", fontFamily: type.regular, fontSize: 9 }, trendBars: { alignItems: "flex-end", flexDirection: "row", gap: 8, height: 99, marginTop: 13 }, trendColumn: { alignItems: "center", flex: 1, height: 99, justifyContent: "flex-end" }, trendAmount: { color: "#5F6368", fontFamily: type.regular, fontSize: 8, marginBottom: 5 }, trendTrack: { backgroundColor: "#E8F0FE", borderRadius: 4, height: 60, justifyContent: "flex-end", overflow: "hidden", width: "100%" }, trendBar: { backgroundColor: "#1A73E8", borderRadius: 4, width: "100%" }, trendLabel: { color: "#5F6368", fontFamily: type.regular, fontSize: 9, marginTop: 5 }, insightAction: { color: "#1A73E8", fontFamily: type.semi, fontSize: 10, marginTop: 7 }, modalBackdrop: { alignItems: "center", backgroundColor: "rgba(32,33,36,0.45)", flex: 1, justifyContent: "center", padding: 24 }, modalCard: { backgroundColor: "#FFFFFF", borderRadius: 18, maxWidth: 380, padding: 20, width: "100%" }, modalTitle: { color: "#202124", fontFamily: type.semi, fontSize: 17 }, modalBody: { color: "#5F6368", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 8 }, modalActions: { flexDirection: "row", gap: 9, justifyContent: "flex-end", marginTop: 20 }, modalSecondary: { borderColor: "#DADCE0", borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 }, modalSecondaryText: { color: "#1A73E8", fontFamily: type.semi, fontSize: 12 }, modalDelete: { backgroundColor: "#D93025", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 }, modalDeleteText: { color: "#FFFFFF", fontFamily: type.semi, fontSize: 12 } });
+function SubscriptionLedgerRow({ item, isDark }: { item: SubscriptionRecord; isDark: boolean }) {
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
+  const service = getService(item.serviceId);
+  const urgency = item.status === "trial" ? styles.urgencyTrial : item.status === "uncertain" ? styles.urgencyMuted : styles.urgencyActive;
+  return <Pressable accessibilityRole="button" onPress={() => router.push(`/subscription/${item.id}` as never)} style={({ pressed }) => [styles.ledgerRow, pressed && styles.pressed]}>
+    <View style={[styles.urgencyRail, urgency]} />
+    <ServiceBadge serviceId={item.serviceId} />
+    <View style={styles.ledgerCopy}>
+      <Text numberOfLines={1} style={styles.ledgerName}>{service?.name ?? item.planName}</Text>
+      <Text numberOfLines={1} style={styles.ledgerMeta}>{item.planName} · {formatRelativeRenewal(item.renewalDate)}</Text>
+    </View>
+    <View style={styles.ledgerValue}><Text style={styles.ledgerAmount}>{formatCurrency(item.amount, item.currency)}</Text><Text style={styles.ledgerCadence}>{item.cadence === "yearly" ? "yearly" : "monthly"}</Text></View>
+  </Pressable>;
+}
 
-const interactionStyles = StyleSheet.create({ toastLayer: { bottom: 0, left: 0, position: "absolute", right: 0, zIndex: 20 }, toast: { alignItems: "center", backgroundColor: "#202124", borderRadius: 16, flexDirection: "row", gap: 12, margin: 18, padding: 14 }, toastCopy: { flex: 1 }, toastTitle: { color: "#FFFFFF", fontFamily: type.semi, fontSize: 12 }, toastBody: { color: "#DADCE0", fontFamily: type.regular, fontSize: 10, marginTop: 2 }, undoButton: { backgroundColor: "#E8F0FE", borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9 }, undoText: { color: "#1967D2", fontFamily: type.semi, fontSize: 12 }, budgetWarning: { alignItems: "flex-start", backgroundColor: "#FCE8E6", borderColor: "#D93025", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, marginTop: 10, padding: 14 }, warningBadge: { alignItems: "center", backgroundColor: "#D93025", borderRadius: 11, height: 22, justifyContent: "center", width: 22 }, warningBadgeText: { color: "#FFFFFF", fontFamily: type.bold, fontSize: 13 }, warningTitle: { color: "#C5221F", fontFamily: type.semi, fontSize: 13 }, warningBody: { color: "#7A271A", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 3 }, categoryTrendCard: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, marginTop: 10, padding: 14 }, categoryTrendHeader: { alignItems: "flex-start", flexDirection: "row", justifyContent: "space-between" }, categoryTrendTitle: { color: "#202124", fontFamily: type.semi, fontSize: 13 }, categoryTrendCaption: { color: "#5F6368", fontFamily: type.regular, fontSize: 10, marginTop: 2 }, categoryTrendRange: { color: "#5F6368", fontFamily: type.regular, fontSize: 9 }, categoryTrendBars: { alignItems: "flex-end", flexDirection: "row", gap: 8, height: 82, marginTop: 12 }, categoryTrendColumn: { alignItems: "center", flex: 1, height: 82, justifyContent: "flex-end" }, categoryTrendTrack: { backgroundColor: "#F1F3F4", borderRadius: 4, height: 60, justifyContent: "flex-end", overflow: "hidden", width: "100%" }, categoryTrendSegment: { width: "100%" }, categoryTrendLabel: { color: "#5F6368", fontFamily: type.regular, fontSize: 9, marginTop: 5 }, legend: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }, legendItem: { alignItems: "center", flexDirection: "row", gap: 4 }, legendDot: { borderRadius: 4, height: 8, width: 8 }, legendText: { color: "#5F6368", fontFamily: type.regular, fontSize: 9 }, categoryTrendFootnote: { color: "#80868B", fontFamily: type.regular, fontSize: 9, lineHeight: 13, marginTop: 10 } });
+export default function HomeScreen() {
+  const { isReady, subscriptions, settings } = useSubscriptions();
+  const { colorScheme } = useThemeContext();
+  const isDark = colorScheme === "dark";
+  const styles = useMemo(() => makeStyles(isDark), [isDark]);
+  const activeSubscriptions = useMemo(() => subscriptions.filter((item) => item.status !== "cancelled").sort((a, b) => a.renewalDate.localeCompare(b.renewalDate)), [subscriptions]);
+  const spend = useMemo(() => getSpendSummary(subscriptions), [subscriptions]);
+  const nextAction = activeSubscriptions.find((item) => item.status === "trial") ?? activeSubscriptions[0];
+  const ledgerItems = activeSubscriptions.slice(0, 5);
+  const chargeStripItems = activeSubscriptions.slice(0, 6);
+  const monthlySpend = totalMonthly(subscriptions);
+  const annualSpend = totalAnnual(subscriptions);
+  const budgetDelta = settings.monthlyBudget ? settings.monthlyBudget - monthlySpend : undefined;
 
-const styles = StyleSheet.create({ loading: { alignItems: "center", flex: 1, justifyContent: "center" }, content: { gap: 24, paddingBottom: 28, paddingTop: 14 }, header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, brand: { color: "#202124", fontFamily: type.bold, fontSize: 25, letterSpacing: -0.8 }, headerCaption: { color: "#5F6368", fontFamily: type.regular, fontSize: 12, marginTop: 2 }, addButton: { alignItems: "center", backgroundColor: "#E8F0FE", borderRadius: 22, height: 44, justifyContent: "center", width: 44 }, addText: { color: "#1A73E8", fontFamily: type.regular, fontSize: 28, lineHeight: 29 }, summaryCard: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, padding: 20 }, summaryTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, summaryLabel: { color: "#5F6368", fontFamily: type.semi, fontSize: 10, letterSpacing: 1 }, summaryAmount: { color: "#202124", fontFamily: type.bold, fontSize: 36, letterSpacing: -1.3, marginTop: 8 }, summaryDivider: { backgroundColor: "#E8EAED", height: 1, marginTop: 19 }, summaryFooter: { flexDirection: "row", justifyContent: "space-between", marginTop: 12 }, summaryFooterLabel: { color: "#5F6368", fontFamily: type.regular, fontSize: 12 }, summaryFooterValue: { color: "#202124", fontFamily: type.semi, fontSize: 12 }, metricRow: { flexDirection: "row", gap: 8 }, metricCard: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 14, borderWidth: 1, flex: 1, paddingHorizontal: 10, paddingVertical: 13 }, metricValue: { color: "#202124", fontFamily: type.bold, fontSize: 20 }, metricLabel: { color: "#5F6368", fontFamily: type.regular, fontSize: 9, lineHeight: 13, marginTop: 3 }, breakdownCard: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, marginTop: 10, padding: 14 }, breakdownHeader: { alignItems: "baseline", flexDirection: "row", justifyContent: "space-between", marginBottom: 11 }, breakdownTitle: { color: "#202124", fontFamily: type.semi, fontSize: 13 }, breakdownCaption: { color: "#5F6368", fontFamily: type.regular, fontSize: 10 }, categorySpend: { marginTop: 10 }, categorySpendTop: { flexDirection: "row", justifyContent: "space-between", marginBottom: 5 }, categorySpendName: { color: "#3C4043", fontFamily: type.semi, fontSize: 11 }, categorySpendAmount: { color: "#5F6368", fontFamily: type.regular, fontSize: 10 }, progressTrack: { backgroundColor: "#E8EAED", borderRadius: 3, height: 6, overflow: "hidden" }, progressFill: { backgroundColor: "#1A73E8", borderRadius: 3, height: 6 }, insightList: { gap: 8, marginTop: 10 }, insightCard: { alignItems: "flex-start", backgroundColor: "#F8F9FA", borderColor: "#E8EAED", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 9, padding: 12 }, insightIcon: { alignItems: "center", backgroundColor: "#E8F0FE", borderRadius: 11, height: 22, justifyContent: "center", width: 22 }, insightIconText: { color: "#1A73E8", fontFamily: type.bold, fontSize: 11 }, insightTitle: { color: "#3C4043", fontFamily: type.semi, fontSize: 12 }, insightBody: { color: "#5F6368", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 2 }, infoRow: { alignItems: "flex-start", backgroundColor: "#F8F9FA", borderColor: "#E8EAED", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, padding: 13 }, infoIcon: { alignItems: "center", backgroundColor: "#E6F4EA", borderRadius: 12, height: 24, justifyContent: "center", width: 24 }, infoIconText: { color: "#188038", fontFamily: type.bold, fontSize: 12 }, infoTitle: { color: "#3C4043", fontFamily: type.semi, fontSize: 12 }, infoBody: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 2 }, section: {}, searchBox: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 24, borderWidth: 1, flexDirection: "row", gap: 8, height: 46, marginBottom: 10, paddingHorizontal: 14 }, searchIcon: { color: "#5F6368", fontFamily: type.regular, fontSize: 22, lineHeight: 22 }, searchInput: { color: "#202124", flex: 1, fontFamily: type.regular, fontSize: 13, height: "100%" }, clearSearch: { color: "#5F6368", fontFamily: type.regular, fontSize: 22, lineHeight: 22 }, categoryRow: { gap: 8, paddingBottom: 10 }, categoryChip: { backgroundColor: "#F1F3F4", borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 }, categoryChipSelected: { backgroundColor: "#E8F0FE" }, categoryChipText: { color: "#3C4043", fontFamily: type.semi, fontSize: 10 }, categoryChipTextSelected: { color: "#1967D2" }, sortRow: { flexDirection: "row", gap: 8, marginBottom: 10 }, sortChip: { backgroundColor: "#F1F3F4", borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 }, sortChipSelected: { backgroundColor: "#E8F0FE" }, sortChipText: { color: "#3C4043", fontFamily: type.semi, fontSize: 10 }, sortChipTextSelected: { color: "#1967D2" }, list: { gap: 10 }, subscriptionCard: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, overflow: "hidden" }, subscriptionTop: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 73, padding: 12 }, subscriptionCopy: { flex: 1, minWidth: 0 }, subscriptionName: { color: "#202124", fontFamily: type.semi, fontSize: 14 }, subscriptionMeta: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, marginTop: 3 }, matchText: { backgroundColor: "#FEF7E0", color: "#A05A00", fontFamily: type.semi }, subscriptionAmount: { alignItems: "flex-end", gap: 4 }, amount: { color: "#202124", fontFamily: type.semi, fontSize: 13 }, cardDivider: { backgroundColor: "#E8EAED", height: 1 }, cardActions: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 8, paddingVertical: 5 }, editAction: { paddingHorizontal: 13, paddingVertical: 7 }, editActionText: { color: "#1A73E8", fontFamily: type.semi, fontSize: 11 }, deleteAction: { paddingHorizontal: 13, paddingVertical: 7 }, deleteActionText: { color: "#C5221F", fontFamily: type.semi, fontSize: 11 }, services: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, service: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 14, borderWidth: 1, padding: 12, width: "48.5%" }, serviceName: { color: "#202124", fontFamily: type.semi, fontSize: 12, marginTop: 8 }, serviceCategory: { color: "#5F6368", fontFamily: type.regular, fontSize: 10, marginTop: 2 }, pressed: { opacity: 0.74, transform: [{ scale: 0.99 }] }, disabledAction: { opacity: 0.58 } });
+  if (!isReady) return <ScreenContainer><View style={styles.loading}><ActivityIndicator color={styles.loadingIndicator.color as string} /></View></ScreenContainer>;
 
-const electric = StyleSheet.create({ addButton: { backgroundColor: "#C6FF00" }, addText: { color: "#081C70" } });
+  return <ScreenContainer containerClassName="bg-background" style={styles.screen}>
+    <FlatList
+      data={ledgerItems}
+      keyExtractor={(item) => item.id}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.content}
+      renderItem={({ item }) => <SubscriptionLedgerRow item={item} isDark={isDark} />}
+      ListHeaderComponent={<>
+        <CommandHeader isDark={isDark} nextAction={nextAction} onReview={() => nextAction ? router.push(`/subscription/edit?subscriptionId=${nextAction.id}&serviceId=${nextAction.serviceId}` as never) : router.push("/(tabs)/discover")} onAdd={() => router.push("/(tabs)/discover")} />
+        <View style={styles.monthOverview}>
+          <View><Text style={styles.overviewKicker}>MONTHLY RUN RATE</Text><Text style={styles.runRate}>{formatCurrency(monthlySpend, spend.currency)}</Text></View>
+          <View style={styles.annualBlock}><Text style={styles.annualLabel}>Annual cost</Text><Text style={styles.annualValue}>{formatCurrency(annualSpend, spend.currency)}</Text></View>
+        </View>
+        <ChargeStrip items={chargeStripItems} currency={spend.currency} isDark={isDark} />
+        <View style={styles.contextCard}>
+          <View style={styles.contextIcon}><Text style={styles.contextIconText}>{budgetDelta === undefined ? "◎" : budgetDelta >= 0 ? "↓" : "!"}</Text></View>
+          <View style={styles.contextCopy}><Text style={styles.contextTitle}>{budgetDelta === undefined ? "Give your spending a reference point" : budgetDelta >= 0 ? `${formatCurrency(budgetDelta, spend.currency)} below your monthly budget` : `${formatCurrency(Math.abs(budgetDelta), spend.currency)} over your monthly budget`}</Text><Text style={styles.contextBody}>{budgetDelta === undefined ? "Set a monthly budget to put each renewal in context." : `${spend.activeCount} active subscriptions are included.`}</Text></View>
+          <Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/settings")} style={({ pressed }) => [styles.contextLink, pressed && styles.pressed]}><Text style={styles.contextLinkText}>{budgetDelta === undefined ? "Set" : "View"}</Text></Pressable>
+        </View>
+        <View style={styles.ledgerHeading}><View><Text style={styles.sectionKicker}>YOUR LIBRARY</Text><Text style={styles.sectionHeading}>Subscriptions</Text></View><Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/subscriptions")} style={({ pressed }) => [styles.manageLink, pressed && styles.pressed]}><Text style={styles.manageLinkText}>Manage all</Text></Pressable></View>
+      </>}
+      ListEmptyComponent={<EmptyState title="Nothing to manage yet" body="Add a service to see its next renewal, monthly run rate, and a direct official-management handoff." />}
+      ListFooterComponent={<View style={styles.footerBlock}><View style={styles.privacyRow}><Text style={styles.privacyMark}>◇</Text><Text style={styles.privacyText}>Local by default. No bank, inbox, or provider access.</Text></View><Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/discover")} style={({ pressed }) => [styles.discoverButton, pressed && styles.pressed]}><Text style={styles.discoverButtonText}>Explore services</Text><Text style={styles.discoverArrow}>→</Text></Pressable></View>}
+      ListFooterComponentStyle={styles.listFooter}
+    />
+  </ScreenContainer>;
+}
 
-const revamp = StyleSheet.create({
-  summaryCard: { backgroundColor: "#102B93", borderColor: "#4A6DFF", borderWidth: 1.5, shadowColor: "#000000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.18, shadowRadius: 18 },
-  summaryLabel: { color: "#DCE5FF" },
-  summaryAmount: { color: "#C6FF00" },
-  summaryDivider: { backgroundColor: "#4A6DFF" },
-  summaryFooterLabel: { color: "#DCE5FF" },
-  summaryFooterValue: { color: "#FFFFFF" },
-  quickActionRow: { flexDirection: "row", gap: 10, marginTop: -12 },
-  quickPrimary: { alignItems: "center", backgroundColor: "#C6FF00", borderRadius: 15, flex: 1.2, flexDirection: "row", justifyContent: "space-between", minHeight: 52, paddingHorizontal: 15 },
-  quickPrimaryText: { color: "#081C70", fontFamily: type.semi, fontSize: 12 },
-  quickPrimaryArrow: { color: "#081C70", fontFamily: type.bold, fontSize: 20, lineHeight: 20 },
-  quickSecondary: { alignItems: "center", backgroundColor: "#102B93", borderColor: "#4A6DFF", borderRadius: 15, borderWidth: 1, flex: 0.8, flexDirection: "row", justifyContent: "space-between", minHeight: 52, paddingHorizontal: 13 },
-  quickSecondaryText: { color: "#FFFFFF", fontFamily: type.semi, fontSize: 11 },
-  quickSecondaryArrow: { color: "#C6FF00", fontFamily: type.regular, fontSize: 22, lineHeight: 20 },
-});
+function makeStyles(isDark: boolean) {
+  const palette = isDark ? {
+    canvas: "#101116", surface: "#17191F", surfaceRaised: "#1D2028", text: "#F5F3EE", muted: "#A4A7B0", quiet: "#727684", border: "#2A2D37", rail: "#333745", accent: "#8B82FF", alert: "#FF625F", good: "#67D391", softAccent: "#24243B", softAlert: "#331C22", pressed: 0.76,
+  } : {
+    canvas: "#F5F5F1", surface: "#FFFFFF", surfaceRaised: "#F0F0EB", text: "#20211E", muted: "#696B66", quiet: "#878982", border: "#DEDED7", rail: "#D4D5CE", accent: "#635AE6", alert: "#CF4B49", good: "#229B69", softAccent: "#ECEBFF", softAlert: "#FFF0EF", pressed: 0.72,
+  };
+  return StyleSheet.create({
+    screen: { backgroundColor: palette.canvas },
+    loading: { alignItems: "center", backgroundColor: palette.canvas, flex: 1, justifyContent: "center" },
+    loadingIndicator: { color: palette.accent },
+    content: { paddingBottom: 34, paddingHorizontal: 20, paddingTop: 18 },
+    headerBlock: { gap: 18, paddingBottom: 26 },
+    topLine: { alignItems: "flex-start", flexDirection: "row", gap: 16, justifyContent: "space-between" },
+    eyebrow: { color: palette.accent, fontFamily: FONT.semi, fontSize: 10, letterSpacing: 1.4 },
+    headline: { color: palette.text, fontFamily: FONT.bold, fontSize: 27, letterSpacing: -0.9, lineHeight: 35, marginTop: 6, maxWidth: 272 },
+    addControl: { alignItems: "center", borderColor: palette.border, borderRadius: 24, borderWidth: 1, height: 46, justifyContent: "center", width: 46 },
+    addControlText: { color: palette.text, fontFamily: FONT.regular, fontSize: 28, lineHeight: 30 },
+    actionCard: { alignItems: "center", backgroundColor: palette.surface, borderColor: palette.alert, borderRadius: 18, borderWidth: 1, flexDirection: "row", gap: 12, minHeight: 110, overflow: "hidden", paddingHorizontal: 14, paddingVertical: 16 },
+    actionCardInactive: { borderColor: palette.border },
+    actionRule: { alignSelf: "stretch", backgroundColor: palette.alert, borderRadius: 2, width: 3 },
+    placeholderMark: { alignItems: "center", backgroundColor: palette.softAccent, borderRadius: 15, height: 46, justifyContent: "center", width: 46 },
+    placeholderMarkText: { color: palette.accent, fontFamily: FONT.medium, fontSize: 24 },
+    actionCopy: { flex: 1, minWidth: 0 },
+    actionKicker: { color: palette.alert, fontFamily: FONT.semi, fontSize: 9, letterSpacing: 1.15 },
+    actionService: { color: palette.text, fontFamily: FONT.semi, fontSize: 15, marginTop: 4 },
+    actionDetail: { color: palette.muted, fontFamily: FONT.regular, fontSize: 11, lineHeight: 16, marginTop: 4 },
+    reviewButton: { alignItems: "center", borderColor: palette.alert, borderRadius: 13, borderWidth: 1, minHeight: 38, justifyContent: "center", paddingHorizontal: 12 },
+    reviewButtonText: { color: palette.alert, fontFamily: FONT.semi, fontSize: 11 },
+    monthOverview: { alignItems: "flex-end", flexDirection: "row", justifyContent: "space-between", paddingBottom: 20 },
+    overviewKicker: { color: palette.quiet, fontFamily: FONT.semi, fontSize: 9, letterSpacing: 1.2 },
+    runRate: { color: palette.text, fontFamily: FONT.bold, fontSize: 39, letterSpacing: -1.8, marginTop: 3 },
+    annualBlock: { alignItems: "flex-end", paddingBottom: 5 },
+    annualLabel: { color: palette.quiet, fontFamily: FONT.regular, fontSize: 10 },
+    annualValue: { color: palette.text, fontFamily: FONT.semi, fontSize: 13, marginTop: 3 },
+    runRateBlock: { borderBottomColor: palette.border, borderBottomWidth: 1, borderTopColor: palette.border, borderTopWidth: 1, paddingVertical: 17 },
+    sectionHeadingRow: { alignItems: "flex-start", flexDirection: "row", justifyContent: "space-between" },
+    sectionKicker: { color: palette.quiet, fontFamily: FONT.semi, fontSize: 9, letterSpacing: 1.15 },
+    sectionHeading: { color: palette.text, fontFamily: FONT.semi, fontSize: 17, letterSpacing: -0.3, marginTop: 4 },
+    sectionMeta: { color: palette.muted, fontFamily: FONT.regular, fontSize: 10, marginTop: 9 },
+    chargeStrip: { gap: 10, paddingTop: 16 },
+    chargeToken: { borderColor: palette.border, borderRadius: 12, borderWidth: 1, minWidth: 93, paddingHorizontal: 10, paddingVertical: 10 },
+    chargeTokenFirst: { borderColor: palette.alert },
+    chargeDay: { color: palette.text, fontFamily: FONT.bold, fontSize: 15 },
+    chargeDot: { backgroundColor: palette.accent, borderRadius: 3, height: 6, marginTop: 8, width: 6 },
+    chargeName: { color: palette.text, fontFamily: FONT.medium, fontSize: 10, marginTop: 8 },
+    chargeAmount: { color: palette.muted, fontFamily: FONT.regular, fontSize: 9, marginTop: 2 },
+    emptyChargeText: { color: palette.muted, fontFamily: FONT.regular, fontSize: 12, paddingVertical: 8 },
+    contextCard: { alignItems: "center", backgroundColor: palette.surfaceRaised, borderColor: palette.border, borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 11, marginTop: 18, padding: 14 },
+    contextIcon: { alignItems: "center", backgroundColor: palette.softAccent, borderRadius: 16, height: 32, justifyContent: "center", width: 32 },
+    contextIconText: { color: palette.accent, fontFamily: FONT.semi, fontSize: 17 },
+    contextCopy: { flex: 1 },
+    contextTitle: { color: palette.text, fontFamily: FONT.semi, fontSize: 11, lineHeight: 16 },
+    contextBody: { color: palette.muted, fontFamily: FONT.regular, fontSize: 10, lineHeight: 14, marginTop: 2 },
+    contextLink: { minHeight: 38, justifyContent: "center", paddingHorizontal: 4 },
+    contextLinkText: { color: palette.accent, fontFamily: FONT.semi, fontSize: 11 },
+    ledgerHeading: { alignItems: "flex-end", flexDirection: "row", justifyContent: "space-between", paddingBottom: 12, paddingTop: 28 },
+    manageLink: { minHeight: 38, justifyContent: "center" },
+    manageLinkText: { color: palette.accent, fontFamily: FONT.semi, fontSize: 11 },
+    ledgerRow: { alignItems: "center", borderBottomColor: palette.border, borderBottomWidth: 1, flexDirection: "row", gap: 11, minHeight: 76, overflow: "hidden", paddingVertical: 10 },
+    urgencyRail: { alignSelf: "stretch", borderRadius: 2, width: 3 },
+    urgencyActive: { backgroundColor: palette.good },
+    urgencyTrial: { backgroundColor: palette.alert },
+    urgencyMuted: { backgroundColor: palette.quiet },
+    ledgerCopy: { flex: 1, minWidth: 0 },
+    ledgerName: { color: palette.text, fontFamily: FONT.semi, fontSize: 14 },
+    ledgerMeta: { color: palette.muted, fontFamily: FONT.regular, fontSize: 10, marginTop: 3 },
+    ledgerValue: { alignItems: "flex-end" },
+    ledgerAmount: { color: palette.text, fontFamily: FONT.semi, fontSize: 13 },
+    ledgerCadence: { color: palette.quiet, fontFamily: FONT.regular, fontSize: 9, marginTop: 3 },
+    listFooter: { paddingTop: 24 },
+    footerBlock: { gap: 18 },
+    privacyRow: { alignItems: "center", flexDirection: "row", gap: 9 },
+    privacyMark: { color: palette.accent, fontFamily: FONT.semi, fontSize: 17 },
+    privacyText: { color: palette.muted, fontFamily: FONT.regular, fontSize: 10 },
+    discoverButton: { alignItems: "center", backgroundColor: palette.text, borderRadius: 15, flexDirection: "row", justifyContent: "space-between", minHeight: 54, paddingHorizontal: 17 },
+    discoverButtonText: { color: palette.canvas, fontFamily: FONT.semi, fontSize: 13 },
+    discoverArrow: { color: palette.canvas, fontFamily: FONT.regular, fontSize: 19 },
+    pressed: { opacity: palette.pressed, transform: [{ scale: 0.99 }] },
+  });
+}

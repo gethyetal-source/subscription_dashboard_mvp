@@ -103,3 +103,17 @@ Navigation stays familiar and lightweight. Bottom navigation has plain iconograp
 All high-frequency actions are placed within thumb reach: the persistent tab bar, the floating add button on list-based screens, and the primary action at the bottom of detail screens. Forms use simple pickers and segmented controls rather than free-text wherever a bounded selection is available. Destructive actions require confirmation, and official-link actions explain the destination before leaving the app.
 
 The MVP uses local storage. It does not request bank, inbox, or provider-password access; therefore onboarding can be lightweight and transparent.
+
+## Production redesign direction
+
+The production redesign abandons decorative hero treatments and generic finance-dashboard conventions. The Home screen becomes a **renewal command center**: it starts with the next decision the user needs to make, moves into a compact monthly run-rate and charge-date view, and ends with a concise subscription ledger. This mirrors the actual reason people open SubTrack—understanding what is due, whether it is still worthwhile, and where to act—rather than over-emphasising a single aggregate total.
+
+| Design decision | Production behaviour |
+|---|---|
+| Primary hierarchy | Surface the nearest renewal or trial first, with one direct review action. |
+| Monthly context | Show the current run rate alongside a compact chronological charge strip rather than a decorative chart. |
+| Subscription records | Use a dense but legible ledger: service mark, plan, renewal date, amount, and a slim urgency rail. |
+| Navigation | Retain the four stable destinations, but use restrained typography, line icons, and one clear active indicator. |
+| Visual language | Use a neutral, low-glare environment with semantically limited vermilion for urgency, cobalt-lilac for navigation, and green only for confirmed positive status. |
+
+This direction is designed for one-handed portrait use. The home screen’s immediate action, next charges, and record list are all reachable without a visual “hero” competing for attention. Both themes must preserve this hierarchy through relative contrast rather than merely inverting a palette.
