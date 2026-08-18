@@ -164,8 +164,16 @@
 - [x] Enforce strictly future-only next-renewal dates in the calendar and save validation
 - [x] Validate the full visual redesign and renewal-date safeguards
 
+- [x] Research firsthand subscription-management problems from Reddit and Quora without changing the app
+
 - [x] Apply the user-supplied SubTrack icon across launcher, splash, favicon, adaptive icon, and app configuration
 
 - [x] Verify and package any outstanding project changes for publication
 
 - [x] Replace README screenshot placeholders with current SubTrack screen captures
+
+- [x] Add local billing-identity, renewal-notice, and cancellation-follow-up fields to subscriptions
+- [x] Add a Subscription Control Center for discovery, renewal risk, and cancellation follow-up
+- [x] Surface potential duplicate subscriptions and annual-renewal risks without bank or account access
+- [x] Add clear official management handoffs with local confirmation tracking
+- [x] Add deterministic coverage and validate the subscription-control flows

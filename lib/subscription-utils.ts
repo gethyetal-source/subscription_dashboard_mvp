@@ -96,6 +96,80 @@ export function getAttentionScore(subscription: SubscriptionRecord, reference = 
   return Math.min(100, score);
 }
 
+export type SubscriptionControlIssueKind = "cancellation-follow-up" | "possible-duplicate" | "annual-renewal" | "trial-deadline" | "renewal-setting" | "billing-identity" | "billing-source" | "uncertain-status";
+
+export interface SubscriptionControlIssue {
+  id: string;
+  kind: SubscriptionControlIssueKind;
+  priority: number;
+  title: string;
+  body: string;
+  subscriptionIds: string[];
+}
+
+export interface PotentialDuplicateGroup {
+  key: string;
+  subscriptions: SubscriptionRecord[];
+}
+
+function normalizedDuplicateKey(subscription: SubscriptionRecord) {
+  return `${subscription.serviceId.trim().toLowerCase()}::${subscription.planName.trim().toLowerCase()}`;
+}
+
+/**
+ * Finds local records that appear to describe the same service and plan. This is a prompt to review,
+ * not a claim that a provider has charged the user twice.
+ */
+export function getPotentialDuplicateGroups(subscriptions: SubscriptionRecord[]): PotentialDuplicateGroup[] {
+  const grouped = new Map<string, SubscriptionRecord[]>();
+  subscriptions.filter((item) => item.status !== "cancelled").forEach((item) => {
+    const key = normalizedDuplicateKey(item);
+    grouped.set(key, [...(grouped.get(key) ?? []), item]);
+  });
+  return Array.from(grouped.entries())
+    .filter(([, items]) => items.length > 1)
+    .map(([key, subscriptions]) => ({ key, subscriptions }));
+}
+
+/**
+ * Produces transparent, local-only prompts for the subscription problems users can verify themselves.
+ * It never attempts merchant discovery, bank access, inbox parsing, or provider-side cancellation.
+ */
+export function getSubscriptionControlIssues(subscriptions: SubscriptionRecord[], reference = new Date()): SubscriptionControlIssue[] {
+  const active = subscriptions.filter((item) => item.status !== "cancelled");
+  const issues: SubscriptionControlIssue[] = [];
+  active.forEach((subscription) => {
+    const serviceName = getService(subscription.serviceId)?.name ?? subscription.planName;
+    const renewalDays = daysUntil(subscription.renewalDate, reference);
+    if (subscription.cancellationState === "pending") {
+      issues.push({ id: `cancel-${subscription.id}`, kind: "cancellation-follow-up", priority: 100, title: `Confirm ${serviceName} cancellation`, body: "You marked an official cancellation request as pending. Check the provider’s confirmation before treating this charge as stopped.", subscriptionIds: [subscription.id] });
+    }
+    if (subscription.status === "uncertain") {
+      issues.push({ id: `status-${subscription.id}`, kind: "uncertain-status", priority: 85, title: `Verify ${serviceName} is still active`, body: "This record is marked uncertain. Check the billing source and official account before the next renewal.", subscriptionIds: [subscription.id] });
+    }
+    if (subscription.billingSource === "unknown") {
+      issues.push({ id: `source-${subscription.id}`, kind: "billing-source", priority: 70, title: `Identify who bills ${serviceName}`, body: "Record whether the charge comes through a store, provider, carrier, reseller, or another source so you know where to manage it.", subscriptionIds: [subscription.id] });
+    }
+    if (!subscription.billingIdentity?.trim()) {
+      issues.push({ id: `identity-${subscription.id}`, kind: "billing-identity", priority: 65, title: `Add a billing label for ${serviceName}`, body: "Save the exact local merchant label, account alias, or receipt clue that helps you recognize the charge later.", subscriptionIds: [subscription.id] });
+    }
+    if (subscription.status === "trial" && renewalDays >= 0 && renewalDays <= 7) {
+      issues.push({ id: `trial-${subscription.id}`, kind: "trial-deadline", priority: 80, title: `${serviceName} trial ends soon`, body: `Decide before ${formatDate(subscription.trialEndDate ?? subscription.renewalDate)} so a short trial does not become an unplanned paid renewal.`, subscriptionIds: [subscription.id] });
+    }
+    if (subscription.cadence === "yearly" && renewalDays >= 0 && renewalDays <= 45) {
+      issues.push({ id: `annual-${subscription.id}`, kind: "annual-renewal", priority: 75, title: `Review ${serviceName}'s annual renewal`, body: `${formatCurrency(subscription.amount, subscription.currency)} is scheduled for ${formatDate(subscription.renewalDate)}. Confirm the plan and auto-renew setting while there is time to act.`, subscriptionIds: [subscription.id] });
+    }
+    if (subscription.autoRenewStatus !== "off" && renewalDays >= 0 && renewalDays <= 14) {
+      issues.push({ id: `renewal-${subscription.id}`, kind: "renewal-setting", priority: 60, title: `Check ${serviceName}'s renewal setting`, body: subscription.autoRenewStatus === "on" ? "You recorded auto-renew as on. Use the official billing page if you want to change it." : "Your auto-renew setting is not recorded. Check it on the official billing page before the next charge.", subscriptionIds: [subscription.id] });
+    }
+  });
+  getPotentialDuplicateGroups(active).forEach((group) => {
+    const serviceName = getService(group.subscriptions[0]?.serviceId ?? "")?.name ?? group.subscriptions[0]?.planName ?? "A subscription";
+    issues.push({ id: `duplicate-${group.key}`, kind: "possible-duplicate", priority: 90, title: `Review possible duplicate: ${serviceName}`, body: `${group.subscriptions.length} active local records have the same service and plan. Compare billing sources and dates before deleting or cancelling anything.`, subscriptionIds: group.subscriptions.map((item) => item.id) });
+  });
+  return issues.sort((a, b) => b.priority - a.priority || a.title.localeCompare(b.title));
+}
+
 export function getSavingsImpact(subscriptions: SubscriptionRecord[], selectedIds: string[]) {
   const selected = subscriptions.filter((item) => selectedIds.includes(item.id) && item.status !== "cancelled");
   return { monthly: Number(selected.reduce((sum, item) => sum + monthlyAmount(item.amount, item.cadence), 0).toFixed(2)), annual: Number(selected.reduce((sum, item) => sum + annualAmount(item.amount, item.cadence), 0).toFixed(2)) };

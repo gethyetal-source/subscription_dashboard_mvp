@@ -47,6 +47,8 @@ interface SubscriptionStoreValue {
   addSubscription: (draft: SubscriptionDraft) => Promise<SubscriptionRecord>;
   updateSubscription: (id: string, draft: SubscriptionDraft) => Promise<SubscriptionRecord | undefined>;
   updateStatus: (id: string, status: SubscriptionRecord["status"]) => Promise<void>;
+  beginCancellationFollowUp: (id: string) => Promise<void>;
+  confirmCancellation: (id: string) => Promise<void>;
   deleteSubscription: (id: string) => Promise<void>;
   restoreSubscription: (record: SubscriptionRecord) => Promise<void>;
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
@@ -107,6 +109,8 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       const now = new Date().toISOString();
       let record: SubscriptionRecord = {
         ...draft,
+        autoRenewStatus: draft.autoRenewStatus ?? "unknown",
+        cancellationState: draft.cancellationState ?? "none",
         sharedMemberIds: normalizeSharedMemberIds(draft.sharedMemberIds, householdMembers),
         id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         createdAt: now,
@@ -130,6 +134,8 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       let updated: SubscriptionRecord = {
         ...current,
         ...draft,
+        autoRenewStatus: draft.autoRenewStatus ?? current.autoRenewStatus ?? "unknown",
+        cancellationState: draft.cancellationState ?? current.cancellationState ?? "none",
         sharedMemberIds: normalizeSharedMemberIds(draft.sharedMemberIds ?? current.sharedMemberIds, householdMembers),
         updatedAt: new Date().toISOString(),
         reminderIdentifier: undefined,
@@ -149,7 +155,13 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       const current = subscriptions.find((item) => item.id === id);
       if (!current) return;
       if (status === "cancelled") await cancelRenewalReminder(current.reminderIdentifier);
-      let updated = { ...current, status, updatedAt: new Date().toISOString() };
+      const shouldClearFollowUp = status !== "cancelled" && current.cancellationState === "pending";
+      let updated = {
+        ...current,
+        status,
+        ...(shouldClearFollowUp ? { cancellationState: "none" as const, cancellationRequestedAt: undefined, cancellationConfirmedAt: undefined } : {}),
+        updatedAt: new Date().toISOString(),
+      };
       if (status !== "cancelled" && settings.notificationsEnabled && !updated.reminderIdentifier) {
         updated = { ...updated, reminderIdentifier: await scheduleRenewalReminder(updated, settings.reminderDays) };
       }
@@ -157,6 +169,35 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
     },
     [persist, settings, subscriptions],
   );
+
+  const beginCancellationFollowUp = useCallback(async (id: string) => {
+    const current = subscriptions.find((item) => item.id === id);
+    if (!current) return;
+    const updated: SubscriptionRecord = {
+      ...current,
+      status: "uncertain",
+      cancellationState: "pending",
+      cancellationRequestedAt: new Date().toISOString(),
+      cancellationConfirmedAt: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await persist(subscriptions.map((item) => (item.id === id ? updated : item)), settings);
+  }, [persist, settings, subscriptions]);
+
+  const confirmCancellation = useCallback(async (id: string) => {
+    const current = subscriptions.find((item) => item.id === id);
+    if (!current) return;
+    await cancelRenewalReminder(current.reminderIdentifier);
+    const updated: SubscriptionRecord = {
+      ...current,
+      status: "cancelled",
+      cancellationState: "confirmed",
+      cancellationConfirmedAt: new Date().toISOString(),
+      reminderIdentifier: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await persist(subscriptions.map((item) => (item.id === id ? updated : item)), settings);
+  }, [persist, settings, subscriptions]);
 
   const deleteSubscription = useCallback(
     async (id: string) => {
@@ -239,8 +280,8 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
   }, [subscriptions]);
 
   const value = useMemo(
-    () => ({ isReady, subscriptions, settings, householdMembers, addSubscription, updateSubscription, updateStatus, deleteSubscription, restoreSubscription, updateSettings, addHouseholdMember, removeHouseholdMember, resetLocalData }),
-    [addHouseholdMember, addSubscription, deleteSubscription, householdMembers, isReady, removeHouseholdMember, resetLocalData, restoreSubscription, settings, subscriptions, updateSettings, updateStatus, updateSubscription],
+    () => ({ isReady, subscriptions, settings, householdMembers, addSubscription, updateSubscription, updateStatus, beginCancellationFollowUp, confirmCancellation, deleteSubscription, restoreSubscription, updateSettings, addHouseholdMember, removeHouseholdMember, resetLocalData }),
+    [addHouseholdMember, addSubscription, beginCancellationFollowUp, confirmCancellation, deleteSubscription, householdMembers, isReady, removeHouseholdMember, resetLocalData, restoreSubscription, settings, subscriptions, updateSettings, updateStatus, updateSubscription],
   );
 
   return <SubscriptionStore.Provider value={value}>{children}</SubscriptionStore.Provider>;

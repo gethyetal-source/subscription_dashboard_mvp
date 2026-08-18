@@ -12,6 +12,8 @@ export type BillingSource = "apple" | "google" | "provider" | "carrier" | "resel
 export type SubscriptionStatus = "active" | "trial" | "cancelled" | "uncertain";
 export type BillingCadence = "weekly" | "monthly" | "quarterly" | "yearly";
 export type DashboardSort = "upcoming" | "highest-cost";
+export type AutoRenewStatus = "on" | "off" | "unknown";
+export type CancellationState = "none" | "pending" | "confirmed";
 
 export interface HouseholdMember {
   id: string;
@@ -54,6 +56,14 @@ export interface SubscriptionRecord {
   renewalDate: string;
   trialEndDate?: string;
   billingSource: BillingSource;
+  /** A local label copied from a receipt, statement, wallet, or provider account. */
+  billingIdentity?: string;
+  /** User-reported renewal setting. SubTrack never reads or changes this at the provider. */
+  autoRenewStatus?: AutoRenewStatus;
+  /** Local follow-up state after the user opens an official cancellation flow. */
+  cancellationState?: CancellationState;
+  cancellationRequestedAt?: string;
+  cancellationConfirmedAt?: string;
   status: SubscriptionStatus;
   notes?: string;
   reminderEnabled: boolean;
@@ -83,6 +93,11 @@ export interface SubscriptionDraft {
   renewalDate: string;
   trialEndDate?: string;
   billingSource: BillingSource;
+  billingIdentity?: string;
+  autoRenewStatus?: AutoRenewStatus;
+  cancellationState?: CancellationState;
+  cancellationRequestedAt?: string;
+  cancellationConfirmedAt?: string;
   status: SubscriptionStatus;
   notes?: string;
   reminderEnabled: boolean;

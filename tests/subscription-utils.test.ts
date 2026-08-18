@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { annualAmount, getAttentionScore, getCategorySpendTrend, getHouseholdAllocation, getHouseholdContributions, getMonthlySpendTrend, getReviewQueue, getSavingsImpact, getSpendSummary, getUpcomingSubscriptions, isFutureDate, isTodayOrFutureDate, isValidDateString, monthlyAmount, nextLocalDateKey, resolveManagementUrl, sortDashboardSubscriptions, totalAnnual, totalMonthly } from "../lib/subscription-utils";
+import { annualAmount, getAttentionScore, getCategorySpendTrend, getHouseholdAllocation, getHouseholdContributions, getMonthlySpendTrend, getPotentialDuplicateGroups, getReviewQueue, getSavingsImpact, getSpendSummary, getSubscriptionControlIssues, getUpcomingSubscriptions, isFutureDate, isTodayOrFutureDate, isValidDateString, monthlyAmount, nextLocalDateKey, resolveManagementUrl, sortDashboardSubscriptions, totalAnnual, totalMonthly } from "../lib/subscription-utils";
 import type { HouseholdMember, SubscriptionRecord } from "../lib/subscription-types";
 
 const baseRecord: SubscriptionRecord = { id: "sub_1", serviceId: "chatgpt", planId: "plus", planName: "Plus", amount: 20, currency: "USD", cadence: "monthly", renewalDate: "2026-10-10", billingSource: "provider", status: "active", reminderEnabled: true, createdAt: "2026-08-13T00:00:00.000Z", updatedAt: "2026-08-13T00:00:00.000Z" };
@@ -22,6 +22,18 @@ describe("subscription calculations", () => {
   it("builds an actionable review queue from trials, near renewals, and high costs", () => { const trial = { ...baseRecord, id: "sub_trial", status: "trial" as const, renewalDate: "2026-08-20" }; const queue = getReviewQueue([trial], new Date("2026-08-17T12:00:00")); expect(queue[0]?.reasons).toEqual(["trial", "renewal", "high-cost"]); });
   it("calculates selected cancellation savings without counting cancelled records", () => { const yearly = { ...baseRecord, id: "sub_yearly", amount: 120, cadence: "yearly" as const }; const cancelled = { ...baseRecord, id: "sub_cancelled", amount: 50, status: "cancelled" as const }; expect(getSavingsImpact([yearly, cancelled], ["sub_yearly", "sub_cancelled"])).toEqual({ monthly: 10, annual: 120 }); });
   it("scores trial and near-renewal attention transparently", () => { const trial = { ...baseRecord, status: "trial" as const, amount: 60, renewalDate: "2026-08-20" }; expect(getAttentionScore(trial, new Date("2026-08-17T12:00:00"))).toBe(100); });
+  it("flags local control risks for possible duplicates, short trials, annual renewals, unknown billing, and pending cancellation", () => {
+    const duplicateA = { ...baseRecord, id: "dup_a", billingIdentity: "CARD • 1234", autoRenewStatus: "on" as const, renewalDate: "2026-08-30", cadence: "yearly" as const, amount: 120 };
+    const duplicateB = { ...duplicateA, id: "dup_b", renewalDate: "2026-09-02" };
+    const shortTrial = { ...baseRecord, id: "trial", serviceId: "netflix", planName: "Standard", status: "trial" as const, trialEndDate: "2026-08-19", renewalDate: "2026-08-19" };
+    const pending = { ...baseRecord, id: "pending", serviceId: "claude", planName: "Pro", status: "uncertain" as const, billingSource: "unknown" as const, cancellationState: "pending" as const };
+    const groups = getPotentialDuplicateGroups([duplicateA, duplicateB, shortTrial, pending]);
+    const issues = getSubscriptionControlIssues([duplicateA, duplicateB, shortTrial, pending], new Date("2026-08-17T12:00:00"));
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.subscriptions.map((item) => item.id)).toEqual(["dup_a", "dup_b"]);
+    expect(issues.map((item) => item.kind)).toEqual(expect.arrayContaining(["possible-duplicate", "annual-renewal", "trial-deadline", "cancellation-follow-up", "billing-source", "billing-identity", "uncertain-status"]));
+    expect(issues[0]?.kind).toBe("cancellation-follow-up");
+  });
 });
 
 describe("subscription safety helpers", () => {

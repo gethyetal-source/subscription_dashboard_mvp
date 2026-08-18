@@ -114,6 +114,7 @@ export default function RootLayout() {
               <Stack.Screen name="subscription/[id]" />
               <Stack.Screen name="subscription/edit" options={{ presentation: "modal" }} />
               <Stack.Screen name="household" />
+              <Stack.Screen name="control-center" />
               <Stack.Screen name="oauth/callback" />
             </Stack>
             <StatusBar style="dark" />
