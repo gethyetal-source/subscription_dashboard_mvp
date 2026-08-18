@@ -149,9 +149,9 @@ export default function HomeScreen() {
 
 function makeStyles(isDark: boolean) {
   const palette = isDark ? {
-    canvas: "#101116", surface: "#17191F", surfaceRaised: "#1D2028", text: "#F5F3EE", muted: "#A4A7B0", quiet: "#727684", border: "#2A2D37", rail: "#333745", accent: "#8B82FF", alert: "#FF625F", good: "#67D391", softAccent: "#24243B", softAlert: "#331C22", pressed: 0.76,
+    canvas: "#12160B", surface: "#191E0F", surfaceRaised: "#202713", text: "#F4F2E8", muted: "#A8AD98", quiet: "#727A62", border: "#343A25", rail: "#3F482C", accent: "#C9F72D", alert: "#FF8A7A", good: "#92D172", softAccent: "#28301B", softAlert: "#452422", pressed: 0.76,
   } : {
-    canvas: "#F5F5F1", surface: "#FFFFFF", surfaceRaised: "#F0F0EB", text: "#20211E", muted: "#696B66", quiet: "#878982", border: "#DEDED7", rail: "#D4D5CE", accent: "#635AE6", alert: "#CF4B49", good: "#229B69", softAccent: "#ECEBFF", softAlert: "#FFF0EF", pressed: 0.72,
+    canvas: "#F4F3EB", surface: "#FFFEF8", surfaceRaised: "#EAEADE", text: "#20241A", muted: "#65695B", quiet: "#858979", border: "#D9D9CC", rail: "#C7C8B9", accent: "#4A6510", alert: "#B53A33", good: "#397A44", softAccent: "#E5EDD2", softAlert: "#FBEDE8", pressed: 0.72,
   };
   return StyleSheet.create({
     screen: { backgroundColor: palette.canvas },

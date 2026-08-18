@@ -9,7 +9,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { colorScheme } = useThemeContext();
   const isDark = colorScheme === "dark";
-  const tabColors = isDark ? { active: "#F5F3EE", activeBackground: "#272740", background: "#101116", border: "#2A2D37", inactive: "#858995" } : { active: "#29243E", activeBackground: "#ECEBFF", background: "#FAFAF7", border: "#DDDCD5", inactive: "#74766F" };
+  const tabColors = isDark ? { active: "#172108", activeBackground: "#C9F72D", background: "#12160B", border: "#343A25", inactive: "#A8AD98" } : { active: "#F4F2E8", activeBackground: "#4A6510", background: "#F4F3EB", border: "#D9D9CC", inactive: "#65695B" };
   const bottomPadding = Platform.OS === "web" ? 10 : Math.max(insets.bottom, 8);
   const tabBarHeight = 60 + bottomPadding;
   return (

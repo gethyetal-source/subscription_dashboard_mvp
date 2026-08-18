@@ -8,7 +8,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { ElectricPageHeader } from "@/components/electric-page-header";
 import { useSubscriptions } from "@/lib/subscription-store";
 import type { SubscriptionDraft, SubscriptionRecord, SubscriptionStatus } from "@/lib/subscription-types";
-import { isTodayOrFutureDate, localDateKey } from "@/lib/subscription-utils";
+import { isFutureDate, nextLocalDateKey } from "@/lib/subscription-utils";
 
 const filters: Array<{ label: string; value: "all" | SubscriptionStatus }> = [{ label: "All", value: "all" }, { label: "Active", value: "active" }, { label: "Trials", value: "trial" }, { label: "Cancelled", value: "cancelled" }];
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
@@ -47,8 +47,8 @@ export default function SubscriptionsScreen() {
       setAmountError("Enter an amount greater than 0.");
       return;
     }
-    if (!isTodayOrFutureDate(renewalDate)) {
-      setAmountError("Choose today or a future renewal date.");
+    if (!isFutureDate(renewalDate)) {
+      setAmountError("Choose a renewal date after today.");
       return;
     }
 
@@ -99,7 +99,7 @@ export default function SubscriptionsScreen() {
         </View>
       </View>
     </Modal>
-    <DatePickerSheet visible={showDatePicker} value={renewalDate} minDate={localDateKey()} title="Select renewal date" onClose={() => setShowDatePicker(false)} onSelect={setRenewalDate} />
+    <DatePickerSheet visible={showDatePicker} value={renewalDate} minDate={nextLocalDateKey()} title="Select renewal date" onClose={() => setShowDatePicker(false)} onSelect={setRenewalDate} />
 
     <Modal visible={!!deleteCandidate} transparent animationType="fade" onRequestClose={() => !isDeleting && setDeleteCandidate(null)}>
       <View style={styles.modalBackdrop}>
@@ -121,38 +121,38 @@ const styles = StyleSheet.create({
   addButton: { backgroundColor: "#1A73E8", borderRadius: 22, paddingHorizontal: 17, paddingVertical: 11 },
   addText: { color: "#FFFFFF", fontFamily: type.semi, fontSize: 12 },
   filters: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
-  filter: { backgroundColor: "#F1F3F4", borderRadius: 18, paddingHorizontal: 13, paddingVertical: 8 },
-  filterSelected: { backgroundColor: "#E8F0FE" },
-  filterText: { color: "#3C4043", fontFamily: type.semi, fontSize: 11 },
-  filterTextSelected: { color: "#1967D2", fontFamily: type.semi, fontSize: 11 },
+  filter: { backgroundColor: "#1D2212", borderColor: "#343A25", borderRadius: 10, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 8 },
+  filterSelected: { backgroundColor: "#C9F72D" },
+  filterText: { color: "#C5CBB8", fontFamily: type.semi, fontSize: 11 },
+  filterTextSelected: { color: "#172108", fontFamily: type.semi, fontSize: 11 },
   separator: { height: 10 },
-  modalBackdrop: { backgroundColor: "rgba(32,33,36,0.45)", flex: 1, justifyContent: "flex-end" },
-  quickEditSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
-  deleteSheet: { backgroundColor: "#FFFFFF", borderRadius: 20, margin: 20, padding: 20 },
+  modalBackdrop: { backgroundColor: "rgba(6,8,3,0.74)", flex: 1, justifyContent: "flex-end" },
+  quickEditSheet: { backgroundColor: "#191E0F", borderColor: "#3A4227", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, padding: 20 },
+  deleteSheet: { backgroundColor: "#191E0F", borderColor: "#3A4227", borderRadius: 20, borderWidth: 1, margin: 20, padding: 20 },
   sheetHeader: { alignItems: "flex-start", flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
-  sheetTitle: { color: "#202124", fontFamily: type.semi, fontSize: 17 },
-  sheetCaption: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, marginTop: 3 },
-  close: { color: "#5F6368", fontFamily: type.regular, fontSize: 28, lineHeight: 28 },
-  fieldLabel: { color: "#3C4043", fontFamily: type.semi, fontSize: 12, marginBottom: 7, marginTop: 3 },
-  input: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 12, borderWidth: 1, color: "#202124", fontFamily: type.regular, fontSize: 15, minHeight: 48, paddingHorizontal: 13 },
-  inputError: { borderColor: "#D93025" },
-  errorText: { color: "#D93025", fontFamily: type.regular, fontSize: 10, minHeight: 18, paddingTop: 4 },
-  dateField: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 12, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", minHeight: 48, paddingHorizontal: 13 },
-  dateValue: { color: "#202124", fontFamily: type.regular, fontSize: 14 },
-  calendarIcon: { color: "#1A73E8", fontFamily: type.semi, fontSize: 18 },
+  sheetTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 17 },
+  sheetCaption: { color: "#A8AD98", fontFamily: type.regular, fontSize: 11, marginTop: 3 },
+  close: { color: "#A8AD98", fontFamily: type.regular, fontSize: 28, lineHeight: 28 },
+  fieldLabel: { color: "#C5CBB8", fontFamily: type.semi, fontSize: 12, marginBottom: 7, marginTop: 3 },
+  input: { backgroundColor: "#12160B", borderColor: "#3A4227", borderRadius: 12, borderWidth: 1, color: "#F4F2E8", fontFamily: type.regular, fontSize: 15, minHeight: 48, paddingHorizontal: 13 },
+  inputError: { borderColor: "#FF8A7A" },
+  errorText: { color: "#FF9B8C", fontFamily: type.regular, fontSize: 10, minHeight: 18, paddingTop: 4 },
+  dateField: { alignItems: "center", backgroundColor: "#12160B", borderColor: "#3A4227", borderRadius: 12, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", minHeight: 48, paddingHorizontal: 13 },
+  dateValue: { color: "#F4F2E8", fontFamily: type.regular, fontSize: 14 },
+  calendarIcon: { color: "#C9F72D", fontFamily: type.semi, fontSize: 18 },
   sheetActions: { flexDirection: "row", gap: 10, justifyContent: "flex-end", marginTop: 22 },
-  cancelButton: { alignItems: "center", borderColor: "#DADCE0", borderRadius: 22, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 17 },
-  cancelButtonText: { color: "#1A73E8", fontFamily: type.semi, fontSize: 12 },
-  saveButton: { alignItems: "center", backgroundColor: "#1A73E8", borderRadius: 22, justifyContent: "center", minHeight: 44, paddingHorizontal: 17 },
-  saveButtonText: { color: "#FFFFFF", fontFamily: type.semi, fontSize: 12 },
-  deleteTitle: { color: "#202124", fontFamily: type.semi, fontSize: 17 },
-  deleteBody: { color: "#5F6368", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 8 },
+  cancelButton: { alignItems: "center", borderColor: "#3A4227", borderRadius: 12, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 17 },
+  cancelButtonText: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 12 },
+  saveButton: { alignItems: "center", backgroundColor: "#C9F72D", borderRadius: 12, justifyContent: "center", minHeight: 44, paddingHorizontal: 17 },
+  saveButtonText: { color: "#172108", fontFamily: type.semi, fontSize: 12 },
+  deleteTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 17 },
+  deleteBody: { color: "#A8AD98", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 8 },
   deleteButton: { alignItems: "center", backgroundColor: "#C5221F", borderRadius: 22, justifyContent: "center", minHeight: 44, paddingHorizontal: 17 },
   deleteButtonText: { color: "#FFFFFF", fontFamily: type.semi, fontSize: 12 },
   disabled: { opacity: 0.56 },
   pressed: { opacity: 0.75 },
 });
 
-const electric = StyleSheet.create({ addButton: { alignItems: "center", backgroundColor: "#C6FF00", borderRadius: 18, justifyContent: "center", minHeight: 38, paddingHorizontal: 13 }, addText: { color: "#081C70", fontFamily: type.semi, fontSize: 12 } });
+const electric = StyleSheet.create({ addButton: { alignItems: "center", backgroundColor: "#C9F72D", borderRadius: 12, justifyContent: "center", minHeight: 38, paddingHorizontal: 13 }, addText: { color: "#172108", fontFamily: type.semi, fontSize: 12 } });
 
-const revamp = StyleSheet.create({ filters: { marginTop: 16 }, filterSelected: { backgroundColor: "#C6FF00", borderColor: "#C6FF00" }, filterTextSelected: { color: "#081C70" } });
+const revamp = StyleSheet.create({ filters: { marginTop: 16 }, filterSelected: { backgroundColor: "#C9F72D", borderColor: "#C9F72D" }, filterTextSelected: { color: "#172108" } });

@@ -159,3 +159,7 @@
 - [x] Generate an improved visual-only version of the approved editorial SubTrack concept
 
 - [x] Generate coordinated visual-only previews for Discover, subscription library, and subscription detail
+
+- [x] Apply the approved editorial dark-olive and chartreuse design system across the live app
+- [x] Enforce strictly future-only next-renewal dates in the calendar and save validation
+- [x] Validate the full visual redesign and renewal-date safeguards

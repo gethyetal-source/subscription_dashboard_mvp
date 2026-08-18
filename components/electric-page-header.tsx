@@ -8,9 +8,9 @@ export function ElectricPageHeader({ title, subtitle, trailing }: { title: strin
 }
 
 const styles = StyleSheet.create({
-  header: { alignItems: "center", backgroundColor: "#1238D7", borderColor: "#3657E8", borderRadius: 20, borderWidth: 1, flexDirection: "row", gap: 12, minHeight: 86, paddingHorizontal: 17, paddingVertical: 15 },
+  header: { alignItems: "center", backgroundColor: "#191E0F", borderColor: "#3A4227", borderRadius: 18, borderWidth: 1, flexDirection: "row", gap: 12, minHeight: 86, paddingHorizontal: 17, paddingVertical: 15 },
   copy: { flex: 1, minWidth: 0 },
-  title: { color: "#C6FF00", fontFamily: type.bold, fontSize: 27, letterSpacing: -0.8 },
-  subtitle: { color: "#E6ECFF", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  title: { color: "#F4F2E8", fontFamily: type.bold, fontSize: 27, letterSpacing: -0.8 },
+  subtitle: { color: "#A8AD98", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 3 },
   trailing: { flexShrink: 0 },
 });
