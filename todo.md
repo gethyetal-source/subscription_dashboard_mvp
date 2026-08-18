@@ -157,3 +157,5 @@
 - [x] Deliver the final editorial concept in chat without further live-app changes
 
 - [x] Generate an improved visual-only version of the approved editorial SubTrack concept
+
+- [x] Generate coordinated visual-only previews for Discover, subscription library, and subscription detail
