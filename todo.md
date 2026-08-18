@@ -137,3 +137,5 @@
 - [x] Repair broken visual surfaces and make light/dark themes clearly distinct
 - [x] Prevent past dates from being selected as a subscription’s next renewal date
 - [x] Add regression coverage and validate the stabilization fixes
+
+- [x] Remove the dashboard subscriptions-worth-reviewing surface
