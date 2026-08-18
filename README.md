@@ -30,19 +30,19 @@ SubTrack is a cross-platform Expo application for people who want a clear view o
 
 ## Screenshots
 
-> The images below are intentionally labeled placeholders. Replace each file in `docs/screenshots/` with a current product screenshot while keeping the same filename, or update the image path in this section.
+> These captures show the current mobile-first SubTrack interface in its empty-state configuration, using the product’s editorial olive and chartreuse visual system.
 
 ### Dashboard
 
-![SubTrack dashboard screenshot placeholder](docs/screenshots/dashboard-placeholder.svg)
+![SubTrack dashboard showing the renewal command center, spending context, and empty subscription state](docs/screenshots/dashboard.png)
 
 ### Service discovery
 
-![SubTrack discovery screenshot placeholder](docs/screenshots/discovery-placeholder.svg)
+![SubTrack Discover screen showing search, category filters, and the curated service catalog](docs/screenshots/discovery.png)
 
 ### Subscription management
 
-![SubTrack subscription management screenshot placeholder](docs/screenshots/subscription-management-placeholder.svg)
+![SubTrack Subscriptions screen showing status filters and the subscription-library empty state](docs/screenshots/subscription-management.png)
 
 ## Privacy model
 

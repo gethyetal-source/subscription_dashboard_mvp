@@ -167,3 +167,5 @@
 - [x] Apply the user-supplied SubTrack icon across launcher, splash, favicon, adaptive icon, and app configuration
 
 - [x] Verify and package any outstanding project changes for publication
+
+- [x] Replace README screenshot placeholders with current SubTrack screen captures
