@@ -139,3 +139,5 @@
 - [x] Add regression coverage and validate the stabilization fixes
 
 - [x] Remove the dashboard subscriptions-worth-reviewing surface
+
+- [x] Expand Discover with additional verified subscription services, plan data, official links, and logos
