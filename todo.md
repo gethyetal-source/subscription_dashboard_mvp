@@ -151,3 +151,5 @@
 - [x] Create a product-specific, world-class SubTrack dashboard concept with refined UX hierarchy
 
 - [x] Replace the generic dashboard with a production-ready, original SubTrack interface and design system
+
+- [x] Generate a visual-only editorial SubTrack concept inspired by the supplied product-poster composition
