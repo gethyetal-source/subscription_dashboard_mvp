@@ -165,3 +165,5 @@
 - [x] Validate the full visual redesign and renewal-date safeguards
 
 - [x] Apply the user-supplied SubTrack icon across launcher, splash, favicon, adaptive icon, and app configuration
+
+- [x] Verify and package any outstanding project changes for publication
