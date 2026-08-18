@@ -163,3 +163,5 @@
 - [x] Apply the approved editorial dark-olive and chartreuse design system across the live app
 - [x] Enforce strictly future-only next-renewal dates in the calendar and save validation
 - [x] Validate the full visual redesign and renewal-date safeguards
+
+- [x] Apply the user-supplied SubTrack icon across launcher, splash, favicon, adaptive icon, and app configuration

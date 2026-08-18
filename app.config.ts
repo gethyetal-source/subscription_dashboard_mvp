@@ -32,7 +32,7 @@ const env = {
   appSlug: "subscription_dashboard_mvp",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "/manus-storage/subtrack-launcher-icon_2554e65c.png",
+  logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663200392699/TLNiEMNEhQgATXYc.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
@@ -122,9 +122,9 @@ const config: ExpoConfig = {
         image: "./assets/images/splash-icon.png",
         imageWidth: 200,
         resizeMode: "contain",
-        backgroundColor: "#ffffff",
+        backgroundColor: "#11150B",
         dark: {
-          backgroundColor: "#000000",
+          backgroundColor: "#11150B",
         },
       },
     ],
