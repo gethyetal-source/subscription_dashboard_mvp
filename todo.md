@@ -198,13 +198,13 @@
 
 - [x] Restart the preview during Supabase callback validation
 
-- [ ] Diagnose and repair the live Supabase sign-up failure
+- [x] Diagnose and repair the live Supabase sign-up failure
 
 - [x] Route web auth emails to the configured SubTrack domain and explain Supabase email-rate limits clearly
 
-- [ ] Configure Brevo as Supabase’s transactional SMTP provider
-- [ ] Validate Brevo email delivery for confirmation and password recovery
+- [x] Configure Brevo as Supabase’s transactional SMTP provider
+- [x] Validate Brevo email delivery for confirmation and password recovery
 
-- [ ] Fix the deployed web callback route returning Cannot GET for Supabase email links
+- [x] Fix the deployed web callback route returning Cannot GET for Supabase email links
 
-- [ ] Repair the production build artifact expected at dist/index.js and restore the public deployment
+- [x] Repair the production build artifact expected at dist/index.js and restore the public deployment
