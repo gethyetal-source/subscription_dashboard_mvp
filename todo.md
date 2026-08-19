@@ -186,3 +186,5 @@
 - [x] Restore the stopped mobile preview service
 - [x] Add an explicit cloud-account login entry point for Supabase sync
 - [x] Validate and checkpoint the login entry-point flow
+
+- [x] Restart the preview and validate the Supabase authentication configuration
