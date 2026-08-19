@@ -177,3 +177,8 @@
 - [x] Surface potential duplicate subscriptions and annual-renewal risks without bank or account access
 - [x] Add clear official management handoffs with local confirmation tracking
 - [x] Add deterministic coverage and validate the subscription-control flows
+
+- [x] Package the research-backed privacy-first product-improvement workflow as a reusable skill
+
+- [x] Connect an opt-in Supabase project for cross-device subscription sync and shared households
+- [x] Preserve local-first behavior and exclude bank-transaction and email-receipt detection

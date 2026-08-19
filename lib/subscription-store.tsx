@@ -12,6 +12,12 @@ interface StoredState {
   householdMembers?: HouseholdMember[];
 }
 
+export interface LocalSubscriptionSnapshot {
+  subscriptions: SubscriptionRecord[];
+  settings: AppSettings;
+  householdMembers: HouseholdMember[];
+}
+
 const defaultSettings: AppSettings = {
   reminderDays: 3,
   notificationsEnabled: true,
@@ -54,6 +60,7 @@ interface SubscriptionStoreValue {
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
   addHouseholdMember: (name: string) => Promise<HouseholdMember | undefined>;
   removeHouseholdMember: (id: string) => Promise<void>;
+  replaceLocalSnapshot: (snapshot: LocalSubscriptionSnapshot) => Promise<void>;
   resetLocalData: () => Promise<void>;
 }
 
@@ -271,6 +278,26 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
     await persist(nextSubscriptions, settings, nextMembers);
   }, [householdMembers, persist, settings, subscriptions]);
 
+  const replaceLocalSnapshot = useCallback(async (snapshot: LocalSubscriptionSnapshot) => {
+    const nextMembers = normalizeHouseholdMembers(snapshot.householdMembers);
+    const nextSettings = { ...defaultSettings, ...snapshot.settings };
+    await Promise.all(subscriptions.map((item) => cancelRenewalReminder(item.reminderIdentifier)));
+    const nextSubscriptions = await Promise.all(
+      snapshot.subscriptions.map(async (item) => {
+        const restored: SubscriptionRecord = {
+          ...item,
+          reminderIdentifier: undefined,
+          sharedMemberIds: normalizeSharedMemberIds(item.sharedMemberIds, nextMembers),
+        };
+        if (nextSettings.notificationsEnabled && restored.reminderEnabled && restored.status !== "cancelled") {
+          return { ...restored, reminderIdentifier: await scheduleRenewalReminder(restored, nextSettings.reminderDays) };
+        }
+        return restored;
+      }),
+    );
+    await persist(nextSubscriptions, nextSettings, nextMembers);
+  }, [persist, subscriptions]);
+
   const resetLocalData = useCallback(async () => {
     await Promise.all(subscriptions.map((item) => cancelRenewalReminder(item.reminderIdentifier)));
     await AsyncStorage.removeItem(STORAGE_KEY);
@@ -280,8 +307,8 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
   }, [subscriptions]);
 
   const value = useMemo(
-    () => ({ isReady, subscriptions, settings, householdMembers, addSubscription, updateSubscription, updateStatus, beginCancellationFollowUp, confirmCancellation, deleteSubscription, restoreSubscription, updateSettings, addHouseholdMember, removeHouseholdMember, resetLocalData }),
-    [addHouseholdMember, addSubscription, beginCancellationFollowUp, confirmCancellation, deleteSubscription, householdMembers, isReady, removeHouseholdMember, resetLocalData, restoreSubscription, settings, subscriptions, updateSettings, updateStatus, updateSubscription],
+    () => ({ isReady, subscriptions, settings, householdMembers, addSubscription, updateSubscription, updateStatus, beginCancellationFollowUp, confirmCancellation, deleteSubscription, restoreSubscription, updateSettings, addHouseholdMember, removeHouseholdMember, replaceLocalSnapshot, resetLocalData }),
+    [addHouseholdMember, addSubscription, beginCancellationFollowUp, confirmCancellation, deleteSubscription, householdMembers, isReady, removeHouseholdMember, replaceLocalSnapshot, resetLocalData, restoreSubscription, settings, subscriptions, updateSettings, updateStatus, updateSubscription],
   );
 
   return <SubscriptionStore.Provider value={value}>{children}</SubscriptionStore.Provider>;

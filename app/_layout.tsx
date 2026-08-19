@@ -21,6 +21,7 @@ import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { SubscriptionProvider } from "@/lib/subscription-store";
+import { CloudSyncProvider } from "@/lib/cloud-sync";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -107,17 +108,20 @@ export default function RootLayout() {
           {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
           <SubscriptionProvider>
-            <Stack screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="service/[id]" />
-              <Stack.Screen name="compare/[serviceId]" />
-              <Stack.Screen name="subscription/[id]" />
-              <Stack.Screen name="subscription/edit" options={{ presentation: "modal" }} />
-              <Stack.Screen name="household" />
-              <Stack.Screen name="control-center" />
-              <Stack.Screen name="oauth/callback" />
-            </Stack>
-            <StatusBar style="dark" />
+            <CloudSyncProvider>
+              <Stack screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="service/[id]" />
+                <Stack.Screen name="compare/[serviceId]" />
+                <Stack.Screen name="subscription/[id]" />
+                <Stack.Screen name="subscription/edit" options={{ presentation: "modal" }} />
+                <Stack.Screen name="household" />
+                <Stack.Screen name="control-center" />
+                <Stack.Screen name="cloud-sync" />
+                <Stack.Screen name="oauth/callback" />
+              </Stack>
+              <StatusBar style="dark" />
+            </CloudSyncProvider>
           </SubscriptionProvider>
         </QueryClientProvider>
       </trpc.Provider>
