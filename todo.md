@@ -206,3 +206,5 @@
 - [ ] Validate Brevo email delivery for confirmation and password recovery
 
 - [ ] Fix the deployed web callback route returning Cannot GET for Supabase email links
+
+- [ ] Repair the production build artifact expected at dist/index.js and restore the public deployment
