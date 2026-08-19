@@ -182,3 +182,7 @@
 
 - [x] Connect an opt-in Supabase project for cross-device subscription sync and shared households
 - [x] Preserve local-first behavior and exclude bank-transaction and email-receipt detection
+
+- [x] Restore the stopped mobile preview service
+- [x] Add an explicit cloud-account login entry point for Supabase sync
+- [x] Validate and checkpoint the login entry-point flow
