@@ -15,9 +15,11 @@ function formatTimestamp(value?: string) {
 }
 
 export default function CloudSyncScreen() {
-  const { isConfigured, isLoading, userEmail, lastSyncAt, signIn, signOut, signUp, syncNow, restoreFromCloud } = useCloudSync();
+  const { isConfigured, isLoading, userEmail, needsProfileSetup, lastSyncAt, signIn, signOut, signUp, requestPasswordReset, updateProfile, syncNow, restoreFromCloud } = useCloudSync();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const run = async (operation: () => Promise<void>) => {
@@ -51,6 +53,25 @@ export default function CloudSyncScreen() {
         "Account created",
         requiresConfirmation ? "Check your inbox to confirm your email, then return and sign in." : "Your cloud-sync account is ready.",
       );
+    });
+  };
+
+  const handleResetRequest = () => {
+    if (!email.trim()) {
+      Alert.alert("Enter your email", "Enter the email address for your cloud account, then request a reset link.");
+      return;
+    }
+    void run(async () => {
+      await requestPasswordReset(email);
+      Alert.alert("Check your inbox", "If an account exists for this email, Supabase will send a reset link. Open it on this device to choose a new password.");
+      setRecoveryMode(false);
+    });
+  };
+
+  const handleProfileSetup = () => {
+    void run(async () => {
+      await updateProfile(displayName);
+      Alert.alert("Profile saved", "Your cloud profile is ready. You can now sync this device whenever you choose.");
     });
   };
 
@@ -89,7 +110,16 @@ export default function CloudSyncScreen() {
           <View style={styles.privacyCopy}><Text style={styles.privacyTitle}>Your cloud snapshot stays private</Text><Text style={styles.privacyBody}>Only your signed-in account can read or replace its snapshot. This feature opens no provider management flow and makes no changes outside SubTrack.</Text></View>
         </View>
 
-        {isLoading ? <View style={styles.loading}><ActivityIndicator color="#C9F72D" /><Text style={styles.loadingText}>Checking cloud sync…</Text></View> : userEmail ? (
+        {isLoading ? <View style={styles.loading}><ActivityIndicator color="#C9F72D" /><Text style={styles.loadingText}>Checking cloud sync…</Text></View> : userEmail && needsProfileSetup ? (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>ONE LAST STEP</Text>
+            <Text style={styles.accountEmail}>{userEmail}</Text>
+            <Text style={styles.cardBody}>Add a name for your SubTrack cloud profile. This is stored only with your optional cloud account.</Text>
+            <Text style={styles.inputLabel}>Your name</Text>
+            <TextInput autoCapitalize="words" autoComplete="name" onChangeText={setDisplayName} placeholder="How should SubTrack address you?" placeholderTextColor="#78806C" style={styles.input} value={displayName} />
+            <Pressable disabled={busy} onPress={handleProfileSetup} style={({ pressed }) => [styles.primaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.primaryButtonText}>{busy ? "Saving…" : "Finish profile setup"}</Text></Pressable>
+          </View>
+        ) : userEmail ? (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>SIGNED IN</Text>
             <Text style={styles.accountEmail}>{userEmail}</Text>
@@ -100,14 +130,11 @@ export default function CloudSyncScreen() {
           </View>
         ) : (
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>SIGN IN TO SYNC</Text>
+            <Text style={styles.cardLabel}>{recoveryMode ? "RESET YOUR PASSWORD" : "SIGN IN TO SYNC"}</Text>
             <Text style={styles.cardBody}>Use an email and password only for your optional SubTrack cloud account. Your device keeps its own local copy.</Text>
             <Text style={styles.inputLabel}>Email</Text>
             <TextInput autoCapitalize="none" autoComplete="email" autoCorrect={false} keyboardType="email-address" onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#78806C" style={styles.input} value={email} />
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput autoCapitalize="none" autoComplete="password" onChangeText={setPassword} placeholder="At least 8 characters" placeholderTextColor="#78806C" secureTextEntry style={styles.input} value={password} />
-            <Pressable disabled={busy} onPress={handleSignIn} style={({ pressed }) => [styles.primaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.primaryButtonText}>{busy ? "Working…" : "Sign in"}</Text></Pressable>
-            <Pressable disabled={busy} onPress={handleSignUp} style={({ pressed }) => [styles.secondaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.secondaryButtonText}>Create a cloud account</Text></Pressable>
+            {recoveryMode ? <><Pressable disabled={busy} onPress={handleResetRequest} style={({ pressed }) => [styles.primaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.primaryButtonText}>{busy ? "Sending…" : "Send reset link"}</Text></Pressable><Pressable disabled={busy} onPress={() => setRecoveryMode(false)} style={({ pressed }) => [styles.secondaryButton, (pressed || busy) && styles.pressed]}><Text style={styles.secondaryButtonText}>Back to sign in</Text></Pressable></> : <><Text style={styles.inputLabel}>Password</Text><TextInput autoCapitalize="none" autoComplete="password" onChangeText={setPassword} placeholder="At least 8 characters" placeholderTextColor="#78806C" secureTextEntry style={styles.input} value={password} /><Pressable disabled={busy} onPress={handleSignIn} style={({ pressed }) => [styles.primaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.primaryButtonText}>{busy ? "Working…" : "Sign in"}</Text></Pressable><Pressable disabled={busy} onPress={handleSignUp} style={({ pressed }) => [styles.secondaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.secondaryButtonText}>Create a cloud account</Text></Pressable><Pressable disabled={busy} onPress={() => setRecoveryMode(true)} style={({ pressed }) => [styles.textButton, (pressed || busy) && styles.pressed]}><Text style={styles.linkButtonText}>Forgot your password?</Text></Pressable></>}
           </View>
         )}
 
@@ -144,6 +171,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: "#E4E8D6", fontFamily: type.semi, fontSize: 13 },
   textButton: { alignItems: "center", marginTop: 16, minHeight: 28 },
   textButtonText: { color: "#FF9B8C", fontFamily: type.semi, fontSize: 12 },
+  linkButtonText: { color: "#C9F72D", fontFamily: type.semi, fontSize: 12 },
   disabled: { opacity: 0.55 },
   pressed: { opacity: 0.74 },
   footnote: { color: "#89917A", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginHorizontal: 12, marginTop: 22, textAlign: "center" },

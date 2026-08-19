@@ -188,3 +188,16 @@
 - [x] Validate and checkpoint the login entry-point flow
 
 - [x] Restart the preview and validate the Supabase authentication configuration
+
+- [ ] Verify Supabase email-reset behavior and safe test-account setup
+- [x] Add password reset and password update flows for cloud accounts
+- [x] Add a post-sign-up profile setup screen for basic display information
+- [ ] Create a dedicated test account and validate sign-up, profile, sign-in, and recovery flows
+
+- [ ] Fix Supabase email links redirecting to localhost and expiring before they reach SubTrack
+
+- [x] Restart the preview during Supabase callback validation
+
+- [ ] Diagnose and repair the live Supabase sign-up failure
+
+- [x] Route web auth emails to the configured SubTrack domain and explain Supabase email-rate limits clearly

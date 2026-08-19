@@ -118,6 +118,7 @@ export default function RootLayout() {
                 <Stack.Screen name="household" />
                 <Stack.Screen name="control-center" />
                 <Stack.Screen name="cloud-sync" />
+                <Stack.Screen name="password-reset" />
                 <Stack.Screen name="oauth/callback" />
               </Stack>
               <StatusBar style="dark" />

@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
+import { Platform } from "react-native";
 
 const projectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -18,7 +19,7 @@ export const supabase = isSupabaseConfigured
         storage: isServerRender ? serverStorage : AsyncStorage,
         autoRefreshToken: !isServerRender,
         persistSession: !isServerRender,
-        detectSessionInUrl: false,
+        detectSessionInUrl: Platform.OS === "web",
       },
     })
   : null;
