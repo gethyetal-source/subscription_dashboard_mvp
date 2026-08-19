@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
@@ -69,6 +70,14 @@ async function startServer() {
       createContext,
     }),
   );
+
+  if (process.env.NODE_ENV === "production") {
+    const webExportDirectory = path.resolve(process.cwd(), "dist");
+    app.use(express.static(webExportDirectory));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(webExportDirectory, "index.html"));
+    });
+  }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
