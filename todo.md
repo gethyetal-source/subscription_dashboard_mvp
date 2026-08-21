@@ -233,8 +233,8 @@
 
 - [x] Add clear cloud-sync status, last-sync context, and a restore preview before local data can be replaced
 - [x] Add deterministic coverage for cloud restore-preview and conflict safeguards
-- [ ] Add explicit reminder-permission status, request guidance, and scheduled-reminder confirmation
-- [ ] Add deterministic coverage for reminder permission and scheduled-delivery states
+- [x] Add explicit reminder-permission status, request guidance, and scheduled-reminder confirmation
+- [x] Add deterministic coverage for reminder permission and scheduled-delivery states
 - [ ] Prevent mixed-currency totals from being presented as a single comparable spend amount
 - [ ] Add catalog freshness, regional-price, and user-correction safeguards
 - [ ] Add deterministic coverage for currency and catalog-accuracy safeguards
