@@ -212,3 +212,9 @@
 - [x] Diagnose and restore the development preview after the repeated unavailable-server reports
 
 - [x] Research recent firsthand subscription-management problems and identify privacy-first SubTrack opportunities
+
+- [x] Restart and verify the development preview after the latest reported interruption
+
+- [x] Restore a stable managed development startup that keeps both the API server and Expo preview alive
+
+- [x] Supervise clean Metro exits so they restart without terminating the development stack
