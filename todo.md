@@ -218,3 +218,5 @@
 - [x] Restore a stable managed development startup that keeps both the API server and Expo preview alive
 
 - [x] Supervise clean Metro exits so they restart without terminating the development stack
+
+- [x] Audit the full SubTrack experience and list user-facing issues without implementing changes
