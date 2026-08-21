@@ -6,7 +6,7 @@ import { EmptyState, ServiceBadge } from "@/components/subscription-ui";
 import { ScreenContainer } from "@/components/screen-container";
 import { getService } from "@/lib/catalog";
 import { useSubscriptions } from "@/lib/subscription-store";
-import { formatCurrency, formatRelativeRenewal, getSpendSummary, totalAnnual, totalMonthly } from "@/lib/subscription-utils";
+import { formatCurrency, formatCurrencySpendGroups, formatRelativeRenewal, getSpendSummary } from "@/lib/subscription-utils";
 import type { SubscriptionRecord } from "@/lib/subscription-types";
 import { useThemeContext } from "@/lib/theme-provider";
 
@@ -61,7 +61,7 @@ function CommandHeader({
   </View>;
 }
 
-function ChargeStrip({ items, currency, isDark }: { items: SubscriptionRecord[]; currency: string; isDark: boolean }) {
+function ChargeStrip({ items, isDark }: { items: SubscriptionRecord[]; isDark: boolean }) {
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
   return <View style={styles.runRateBlock}>
     <View style={styles.sectionHeadingRow}>
@@ -80,7 +80,7 @@ function ChargeStrip({ items, currency, isDark }: { items: SubscriptionRecord[];
           <Text style={styles.chargeDay}>{dayLabel(item.renewalDate)}</Text>
           <View style={styles.chargeDot} />
           <Text numberOfLines={1} style={styles.chargeName}>{service?.name ?? item.planName}</Text>
-          <Text style={styles.chargeAmount}>{formatCurrency(item.amount, currency)}</Text>
+          <Text style={styles.chargeAmount}>{formatCurrency(item.amount, item.currency)}</Text>
         </Pressable>;
       }}
       ListEmptyComponent={<Text style={styles.emptyChargeText}>Your upcoming renewals will appear here.</Text>}
@@ -113,9 +113,7 @@ export default function HomeScreen() {
   const nextAction = activeSubscriptions.find((item) => item.status === "trial") ?? activeSubscriptions[0];
   const ledgerItems = activeSubscriptions.slice(0, 5);
   const chargeStripItems = activeSubscriptions.slice(0, 6);
-  const monthlySpend = totalMonthly(subscriptions);
-  const annualSpend = totalAnnual(subscriptions);
-  const budgetDelta = settings.monthlyBudget ? settings.monthlyBudget - monthlySpend : undefined;
+  const budgetDelta = settings.monthlyBudget && !spend.hasMixedCurrencies ? settings.monthlyBudget - spend.monthly : undefined;
 
   if (!isReady) return <ScreenContainer><View style={styles.loading}><ActivityIndicator color={styles.loadingIndicator.color as string} /></View></ScreenContainer>;
 
@@ -129,14 +127,15 @@ export default function HomeScreen() {
       ListHeaderComponent={<>
         <CommandHeader isDark={isDark} nextAction={nextAction} onReview={() => nextAction ? router.push(`/subscription/edit?subscriptionId=${nextAction.id}&serviceId=${nextAction.serviceId}` as never) : router.push("/(tabs)/discover")} onAdd={() => router.push("/(tabs)/discover")} />
         <View style={styles.monthOverview}>
-          <View><Text style={styles.overviewKicker}>MONTHLY RUN RATE</Text><Text style={styles.runRate}>{formatCurrency(monthlySpend, spend.currency)}</Text></View>
-          <View style={styles.annualBlock}><Text style={styles.annualLabel}>Annual cost</Text><Text style={styles.annualValue}>{formatCurrency(annualSpend, spend.currency)}</Text></View>
+          <View><Text style={styles.overviewKicker}>{spend.hasMixedCurrencies ? "MONTHLY RUN RATE BY CURRENCY" : "MONTHLY RUN RATE"}</Text><Text style={styles.runRate}>{spend.hasMixedCurrencies ? formatCurrencySpendGroups(spend.currencyGroups) : formatCurrency(spend.monthly, spend.currency)}</Text></View>
+          <View style={styles.annualBlock}><Text style={styles.annualLabel}>{spend.hasMixedCurrencies ? "Not converted" : "Annual cost"}</Text><Text style={styles.annualValue}>{spend.hasMixedCurrencies ? "Review per currency" : formatCurrency(spend.annual, spend.currency)}</Text></View>
         </View>
-        <ChargeStrip items={chargeStripItems} currency={spend.currency} isDark={isDark} />
+        {spend.hasMixedCurrencies ? <Text style={styles.currencyGuard}>Currencies are kept separate. SubTrack does not use exchange rates or combine unlike currencies.</Text> : null}
+        <ChargeStrip items={chargeStripItems} isDark={isDark} />
         <View style={styles.contextCard}>
           <View style={styles.contextIcon}><Text style={styles.contextIconText}>{budgetDelta === undefined ? "◎" : budgetDelta >= 0 ? "↓" : "!"}</Text></View>
-          <View style={styles.contextCopy}><Text style={styles.contextTitle}>{budgetDelta === undefined ? "Give your spending a reference point" : budgetDelta >= 0 ? `${formatCurrency(budgetDelta, spend.currency)} below your monthly budget` : `${formatCurrency(Math.abs(budgetDelta), spend.currency)} over your monthly budget`}</Text><Text style={styles.contextBody}>{budgetDelta === undefined ? "Set a monthly budget to put each renewal in context." : `${spend.activeCount} active subscriptions are included.`}</Text></View>
-          <Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/settings")} style={({ pressed }) => [styles.contextLink, pressed && styles.pressed]}><Text style={styles.contextLinkText}>{budgetDelta === undefined ? "Set" : "View"}</Text></Pressable>
+          <View style={styles.contextCopy}><Text style={styles.contextTitle}>{spend.hasMixedCurrencies ? "Budget comparison is paused" : budgetDelta === undefined ? "Give your spending a reference point" : budgetDelta >= 0 ? `${formatCurrency(budgetDelta, spend.currency)} below your monthly budget` : `${formatCurrency(Math.abs(budgetDelta), spend.currency)} over your monthly budget`}</Text><Text style={styles.contextBody}>{spend.hasMixedCurrencies ? "Choose one currency for budget comparison, or review each saved currency separately." : budgetDelta === undefined ? "Set a monthly budget to put each renewal in context." : `${spend.activeCount} active subscriptions are included.`}</Text></View>
+          <Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/settings")} style={({ pressed }) => [styles.contextLink, pressed && styles.pressed]}><Text style={styles.contextLinkText}>{spend.hasMixedCurrencies ? "Review" : budgetDelta === undefined ? "Set" : "View"}</Text></Pressable>
         </View>
         <View style={styles.ledgerHeading}><View><Text style={styles.sectionKicker}>YOUR LIBRARY</Text><Text style={styles.sectionHeading}>Subscriptions</Text></View><Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/subscriptions")} style={({ pressed }) => [styles.manageLink, pressed && styles.pressed]}><Text style={styles.manageLinkText}>Manage all</Text></Pressable></View>
       </>}
@@ -178,6 +177,7 @@ function makeStyles(isDark: boolean) {
     monthOverview: { alignItems: "flex-end", flexDirection: "row", justifyContent: "space-between", paddingBottom: 20 },
     overviewKicker: { color: palette.quiet, fontFamily: FONT.semi, fontSize: 9, letterSpacing: 1.2 },
     runRate: { color: palette.text, fontFamily: FONT.bold, fontSize: 39, letterSpacing: -1.8, marginTop: 3 },
+    currencyGuard: { color: palette.muted, fontFamily: FONT.regular, fontSize: 10, lineHeight: 15, marginTop: -10, paddingBottom: 10 },
     annualBlock: { alignItems: "flex-end", paddingBottom: 5 },
     annualLabel: { color: palette.quiet, fontFamily: FONT.regular, fontSize: 10 },
     annualValue: { color: palette.text, fontFamily: FONT.semi, fontSize: 13, marginTop: 3 },

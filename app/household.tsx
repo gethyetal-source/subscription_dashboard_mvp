@@ -6,7 +6,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { ServiceBadge } from "@/components/subscription-ui";
 import { getService } from "@/lib/catalog";
 import { useSubscriptions } from "@/lib/subscription-store";
-import { formatCurrency, getHouseholdContributions, monthlyAmount } from "@/lib/subscription-utils";
+import { formatCurrency, formatCurrencySpendGroups, getHouseholdContributions, monthlyAmount } from "@/lib/subscription-utils";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
@@ -16,7 +16,6 @@ export default function HouseholdScreen() {
   const activeSubscriptions = useMemo(() => subscriptions.filter((item) => item.status !== "cancelled"), [subscriptions]);
   const contributions = useMemo(() => getHouseholdContributions(activeSubscriptions, householdMembers), [activeSubscriptions, householdMembers]);
   const sharedPlans = activeSubscriptions.filter((item) => (item.sharedMemberIds?.length ?? 1) > 1);
-  const currency = activeSubscriptions[0]?.currency ?? "USD";
 
   const addMember = async () => {
     const added = await addHouseholdMember(memberName);
@@ -77,7 +76,7 @@ export default function HouseholdScreen() {
               <View style={styles.contributionRow}>
                 <View style={[styles.avatarSmall, { backgroundColor: contribution.member.color }]}><Text style={styles.avatarText}>{contribution.member.name.slice(0, 1).toUpperCase()}</Text></View>
                 <View style={styles.flex}><Text style={styles.memberName}>{contribution.member.name}</Text><Text style={styles.memberMeta}>{contribution.sharedPlanCount} active plan{contribution.sharedPlanCount === 1 ? "" : "s"}</Text></View>
-                <Text style={styles.contributionAmount}>{formatCurrency(contribution.monthly, currency)}</Text>
+                <Text style={styles.contributionAmount}>{formatCurrencySpendGroups(contribution.monthlyByCurrency)}</Text>
               </View>
             </View>
           ))}

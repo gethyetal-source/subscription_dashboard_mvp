@@ -12,9 +12,29 @@ export function annualAmount(amount: number, cadence: BillingCadence) { return N
 export function totalMonthly(subscriptions: SubscriptionRecord[]) { return Number(subscriptions.filter((item) => item.status !== "cancelled").reduce((sum, item) => sum + monthlyAmount(item.amount, item.cadence), 0).toFixed(2)); }
 export function totalAnnual(subscriptions: SubscriptionRecord[]) { return Number(subscriptions.filter((item) => item.status !== "cancelled").reduce((sum, item) => sum + annualAmount(item.amount, item.cadence), 0).toFixed(2)); }
 
+export interface CurrencySpendGroup { currency: string; monthly: number; annual: number; subscriptionCount: number; }
+
+export function getCurrencySpendGroups(subscriptions: SubscriptionRecord[]): CurrencySpendGroup[] {
+  const groups = new Map<string, CurrencySpendGroup>();
+  subscriptions.filter((item) => item.status !== "cancelled").forEach((item) => {
+    const currency = item.currency.toUpperCase();
+    const current = groups.get(currency) ?? { currency, monthly: 0, annual: 0, subscriptionCount: 0 };
+    current.monthly += monthlyAmount(item.amount, item.cadence);
+    current.annual += annualAmount(item.amount, item.cadence);
+    current.subscriptionCount += 1;
+    groups.set(currency, current);
+  });
+  return Array.from(groups.values()).map((group) => ({ ...group, monthly: Number(group.monthly.toFixed(2)), annual: Number(group.annual.toFixed(2)) })).sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
+export function formatCurrencySpendGroups(groups: Array<Pick<CurrencySpendGroup, "currency" | "monthly">>) {
+  return groups.map((group) => formatCurrency(group.monthly, group.currency)).join(" · ");
+}
+
 export interface HouseholdContribution {
   member: HouseholdMember;
   monthly: number;
+  monthlyByCurrency: CurrencySpendGroup[];
   sharedPlanCount: number;
 }
 
@@ -37,7 +57,7 @@ export function getHouseholdAllocation(memberIds: string[], customShares?: Recor
  */
 export function getHouseholdContributions(subscriptions: SubscriptionRecord[], members: HouseholdMember[]): HouseholdContribution[] {
   const memberIds = new Set(members.map((member) => member.id));
-  const totals = new Map(members.map((member) => [member.id, { monthly: 0, sharedPlanCount: 0 }]));
+  const totals = new Map(members.map((member) => [member.id, { currencies: new Map<string, number>(), sharedPlanCount: 0 }]));
   subscriptions.filter((item) => item.status !== "cancelled").forEach((item) => {
     const assigned = Array.from(new Set(["owner", ...(item.sharedMemberIds ?? [])])).filter((id) => memberIds.has(id));
     const participantIds = assigned.length ? assigned : [members[0]?.id].filter(Boolean) as string[];
@@ -47,13 +67,15 @@ export function getHouseholdContributions(subscriptions: SubscriptionRecord[], m
     participantIds.forEach((memberId) => {
       const current = totals.get(memberId);
       if (!current) return;
-      current.monthly += monthly * ((allocation[memberId] ?? 0) / 100);
+      const currency = item.currency.toUpperCase();
+      current.currencies.set(currency, (current.currencies.get(currency) ?? 0) + monthly * ((allocation[memberId] ?? 0) / 100));
       current.sharedPlanCount += 1;
     });
   });
   return members.map((member) => {
-    const total = totals.get(member.id) ?? { monthly: 0, sharedPlanCount: 0 };
-    return { member, monthly: Number(total.monthly.toFixed(2)), sharedPlanCount: total.sharedPlanCount };
+    const total = totals.get(member.id) ?? { currencies: new Map<string, number>(), sharedPlanCount: 0 };
+    const monthlyByCurrency = Array.from(total.currencies.entries()).map(([currency, monthly]) => ({ currency, monthly: Number(monthly.toFixed(2)), annual: Number((monthly * 12).toFixed(2)), subscriptionCount: total.sharedPlanCount }));
+    return { member, monthly: monthlyByCurrency.length === 1 ? monthlyByCurrency[0].monthly : 0, monthlyByCurrency, sharedPlanCount: total.sharedPlanCount };
   });
 }
 
@@ -177,15 +199,17 @@ export function getSavingsImpact(subscriptions: SubscriptionRecord[], selectedId
 
 export interface CategorySpend { category: ServiceCategory | "Other"; monthly: number; percentage: number; subscriptionCount: number; }
 export interface SpendInsight { id: "empty" | "concentration" | "renewals" | "trial" | "currency"; title: string; body: string; subscriptionId?: string; }
-export interface SpendSummary { monthly: number; annual: number; activeCount: number; currency: string; categories: CategorySpend[]; upcomingSevenDays: SubscriptionRecord[]; trials: SubscriptionRecord[]; insights: SpendInsight[]; }
+export interface SpendSummary { monthly: number; annual: number; activeCount: number; currency: string; currencyGroups: CurrencySpendGroup[]; hasMixedCurrencies: boolean; categories: CategorySpend[]; upcomingSevenDays: SubscriptionRecord[]; trials: SubscriptionRecord[]; insights: SpendInsight[]; }
 export interface MonthlyTrendPoint { label: string; amount: number; }
 export interface CategoryTrend { category: ServiceCategory | "Other"; points: MonthlyTrendPoint[]; }
 
 export function getSpendSummary(subscriptions: SubscriptionRecord[], reference = new Date()): SpendSummary {
   const active = subscriptions.filter((item) => item.status !== "cancelled");
-  const monthly = totalMonthly(active);
-  const annual = totalAnnual(active);
-  const currency = active[0]?.currency ?? "USD";
+  const currencyGroups = getCurrencySpendGroups(active);
+  const hasMixedCurrencies = currencyGroups.length > 1;
+  const monthly = hasMixedCurrencies ? 0 : currencyGroups[0]?.monthly ?? 0;
+  const annual = hasMixedCurrencies ? 0 : currencyGroups[0]?.annual ?? 0;
+  const currency = currencyGroups[0]?.currency ?? "USD";
   const grouped = active.reduce<Record<string, { monthly: number; subscriptionCount: number }>>((accumulator, item) => {
     const category = getService(item.serviceId)?.category ?? "Other";
     const current = accumulator[category] ?? { monthly: 0, subscriptionCount: 0 };
@@ -194,7 +218,7 @@ export function getSpendSummary(subscriptions: SubscriptionRecord[], reference =
     accumulator[category] = current;
     return accumulator;
   }, {});
-  const categories = Object.entries(grouped).map(([category, value]) => ({ category: category as ServiceCategory | "Other", monthly: Number(value.monthly.toFixed(2)), percentage: monthly ? Math.round((value.monthly / monthly) * 100) : 0, subscriptionCount: value.subscriptionCount })).sort((a, b) => b.monthly - a.monthly);
+  const categories = hasMixedCurrencies ? [] : Object.entries(grouped).map(([category, value]) => ({ category: category as ServiceCategory | "Other", monthly: Number(value.monthly.toFixed(2)), percentage: monthly ? Math.round((value.monthly / monthly) * 100) : 0, subscriptionCount: value.subscriptionCount })).sort((a, b) => b.monthly - a.monthly);
   const upcomingSevenDays = getUpcomingSubscriptions(active).filter((item) => { const days = daysUntil(item.renewalDate, reference); return days >= 0 && days <= 7; });
   const trials = active.filter((item) => item.status === "trial");
   const insights: SpendInsight[] = [];
@@ -206,9 +230,9 @@ export function getSpendSummary(subscriptions: SubscriptionRecord[], reference =
     if (leadingCategory && leadingCategory.percentage >= 40) insights.push({ id: "concentration", title: `${leadingCategory.category} leads your spend`, body: `${leadingCategory.percentage}% of your estimated monthly subscription spend is in this category.`, subscriptionId: leadingRecord?.id });
     if (upcomingSevenDays.length) insights.push({ id: "renewals", title: `${upcomingSevenDays.length} renewal${upcomingSevenDays.length === 1 ? "" : "s"} in the next 7 days`, body: "Review upcoming charges in your dashboard before their renewal dates.", subscriptionId: upcomingSevenDays[0]?.id });
     if (trials.length) insights.push({ id: "trial", title: `${trials.length} active trial${trials.length === 1 ? "" : "s"}`, body: "Check trial end dates so you can decide whether to continue before a paid renewal.", subscriptionId: trials[0]?.id });
-    if (new Set(active.map((item) => item.currency)).size > 1) insights.push({ id: "currency", title: "Multiple currencies detected", body: "Monthly and annual totals combine saved amounts across currencies, so treat them as a directional estimate." });
+    if (hasMixedCurrencies) insights.push({ id: "currency", title: "Multiple currencies detected", body: "Spend is shown separately for each currency. SubTrack does not convert or combine currencies without a user-selected exchange-rate source." });
   }
-  return { monthly, annual, activeCount: active.length, currency, categories, upcomingSevenDays, trials, insights };
+  return { monthly, annual, activeCount: active.length, currency, currencyGroups, hasMixedCurrencies, categories, upcomingSevenDays, trials, insights };
 }
 
 function addCadence(date: Date, cadence: BillingCadence) {

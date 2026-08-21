@@ -434,3 +434,19 @@ export const billingSourceMeta: Record<BillingSource, { label: string; descripti
 export function getService(serviceId: string | undefined) {
   return services.find((service) => service.id === serviceId);
 }
+
+export type CatalogPriceSignal = "reference" | "regional" | "variable";
+
+export function getCatalogPriceSignal(priceLabel: string): CatalogPriceSignal {
+  const label = priceLabel.toLowerCase();
+  if (label.includes("varies") || label.includes("official price")) return "regional";
+  if (label.includes("from ") || label.includes("member/")) return "variable";
+  return "reference";
+}
+
+export function getCatalogPriceGuidance(priceLabel: string) {
+  const signal = getCatalogPriceSignal(priceLabel);
+  if (signal === "regional") return "Price and availability vary by country, taxes, platform, and eligibility. Confirm the official price before saving your amount.";
+  if (signal === "variable") return "This label is not one fixed personal price. Confirm the provider’s current price, seat count, taxes, and billing cadence before saving your amount.";
+  return "This is a catalog reference price, not live billing data. Confirm the provider’s current regional price, taxes, and billing source before saving your amount.";
+}
