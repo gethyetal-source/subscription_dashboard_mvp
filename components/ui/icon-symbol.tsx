@@ -18,6 +18,7 @@ const MAPPING = {
   "safari.fill": "explore",
   "rectangle.stack.fill": "view-agenda",
   "gearshape.fill": "settings",
+  "person.crop.circle": "account-circle",
   "plus": "add",
   "arrow.up.right.square": "open-in-new",
   "checkmark.circle.fill": "check-circle",

@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -15,12 +15,16 @@ function formatTimestamp(value?: string) {
 }
 
 export default function CloudSyncScreen() {
-  const { isConfigured, isLoading, userEmail, needsProfileSetup, lastSyncAt, signIn, signOut, signUp, requestPasswordReset, updateProfile, syncNow, restoreFromCloud } = useCloudSync();
+  const { isConfigured, isLoading, userEmail, profileName, needsProfileSetup, verificationPendingEmail, authCallbackMessage, lastSyncAt, signIn, signOut, signUp, resendVerification, clearVerificationPending, clearAuthCallbackMessage, requestPasswordReset, updateProfile, syncNow, restoreFromCloud } = useCloudSync();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (verificationPendingEmail) setEmail(verificationPendingEmail);
+  }, [verificationPendingEmail]);
 
   const run = async (operation: () => Promise<void>) => {
     try {
@@ -49,10 +53,14 @@ export default function CloudSyncScreen() {
     void run(async () => {
       const requiresConfirmation = await signUp(email, password);
       setPassword("");
-      Alert.alert(
-        "Account created",
-        requiresConfirmation ? "Check your inbox to confirm your email, then return and sign in." : "Your cloud-sync account is ready.",
-      );
+      if (!requiresConfirmation) Alert.alert("Account created", "Your cloud-sync account is ready.");
+    });
+  };
+
+  const handleResendVerification = () => {
+    void run(async () => {
+      await resendVerification();
+      Alert.alert("Verification email sent", "We sent a fresh verification link. Check your inbox and spam folder, then open the newest link on this device.");
     });
   };
 
@@ -110,6 +118,8 @@ export default function CloudSyncScreen() {
           <View style={styles.privacyCopy}><Text style={styles.privacyTitle}>Your cloud snapshot stays private</Text><Text style={styles.privacyBody}>Only your signed-in account can read or replace its snapshot. This feature opens no provider management flow and makes no changes outside SubTrack.</Text></View>
         </View>
 
+        {authCallbackMessage ? <View style={styles.callbackCard}><Text style={styles.callbackTitle}>Email link needs attention</Text><Text style={styles.callbackBody}>{authCallbackMessage}</Text><Pressable onPress={clearAuthCallbackMessage} style={({ pressed }) => [styles.callbackDismiss, pressed && styles.pressed]}><Text style={styles.callbackDismissText}>Dismiss</Text></Pressable></View> : null}
+
         {isLoading ? <View style={styles.loading}><ActivityIndicator color="#C9F72D" /><Text style={styles.loadingText}>Checking cloud sync…</Text></View> : userEmail && needsProfileSetup ? (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>ONE LAST STEP</Text>
@@ -123,10 +133,20 @@ export default function CloudSyncScreen() {
           <View style={styles.card}>
             <Text style={styles.cardLabel}>SIGNED IN</Text>
             <Text style={styles.accountEmail}>{userEmail}</Text>
-            <Text style={styles.cardBody}>Last successful sync: {formatTimestamp(lastSyncAt)}.</Text>
+            <Text style={styles.cardBody}>{profileName ? `${profileName} · ` : ""}Last successful sync: {formatTimestamp(lastSyncAt)}.</Text>
+            <Pressable disabled={busy} onPress={() => router.push("/(tabs)/profile" as never)} style={({ pressed }) => [styles.secondaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.secondaryButtonText}>View and edit profile</Text></Pressable>
             <Pressable disabled={busy} onPress={() => void run(syncNow)} style={({ pressed }) => [styles.primaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.primaryButtonText}>{busy ? "Working…" : "Sync this device now"}</Text></Pressable>
             <Pressable disabled={busy} onPress={handleRestore} style={({ pressed }) => [styles.secondaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.secondaryButtonText}>Restore cloud backup</Text></Pressable>
             <Pressable disabled={busy} onPress={() => void run(signOut)} style={({ pressed }) => [styles.textButton, (pressed || busy) && styles.pressed]}><Text style={styles.textButtonText}>Sign out of cloud sync</Text></Pressable>
+          </View>
+        ) : verificationPendingEmail ? (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>CHECK YOUR INBOX</Text>
+            <Text style={styles.accountEmail}>{verificationPendingEmail}</Text>
+            <Text style={styles.cardBody}>Your account is waiting for email confirmation. Open the newest SubTrack verification link on this device. Check spam or promotions if you do not see it.</Text>
+            <Pressable disabled={busy} onPress={handleResendVerification} style={({ pressed }) => [styles.primaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.primaryButtonText}>{busy ? "Sending…" : "Resend verification email"}</Text></Pressable>
+            <Pressable disabled={busy} onPress={() => void clearVerificationPending()} style={({ pressed }) => [styles.secondaryButton, (pressed || busy) && styles.pressed]}><Text style={styles.secondaryButtonText}>I already verified — sign in</Text></Pressable>
+            <Pressable disabled={busy} onPress={() => void clearVerificationPending()} style={({ pressed }) => [styles.textButton, (pressed || busy) && styles.pressed]}><Text style={styles.linkButtonText}>Use a different email</Text></Pressable>
           </View>
         ) : (
           <View style={styles.card}>
@@ -157,6 +177,11 @@ const styles = StyleSheet.create({
   privacyCopy: { flex: 1 },
   privacyTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 13 },
   privacyBody: { color: "#A8AD98", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 4 },
+  callbackCard: { backgroundColor: "#3B2519", borderColor: "#815342", borderRadius: 14, borderWidth: 1, marginTop: 18, padding: 15 },
+  callbackTitle: { color: "#FFD2C8", fontFamily: type.semi, fontSize: 13 },
+  callbackBody: { color: "#F4D5CD", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 4 },
+  callbackDismiss: { alignSelf: "flex-start", marginTop: 10, minHeight: 28, paddingVertical: 4 },
+  callbackDismissText: { color: "#FFB5A7", fontFamily: type.semi, fontSize: 11 },
   loading: { alignItems: "center", gap: 10, paddingTop: 50 },
   loadingText: { color: "#A8AD98", fontFamily: type.regular, fontSize: 12 },
   card: { backgroundColor: "#191E0F", borderColor: "#343A25", borderRadius: 16, borderWidth: 1, marginTop: 18, padding: 16 },

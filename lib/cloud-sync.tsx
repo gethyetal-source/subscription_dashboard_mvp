@@ -4,11 +4,13 @@ import * as Linking from "expo-linking";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { Platform } from "react-native";
 
-import { useSubscriptions, type LocalSubscriptionSnapshot } from "@/lib/subscription-store";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { getAuthCallbackMessage, getCloudAuthErrorMessage, getSessionTokensFromAuthUrl } from "@/lib/cloud-sync-auth-utils";
 import { isCloudSnapshot, prepareCloudSnapshot } from "@/lib/cloud-sync-utils";
+import { useSubscriptions } from "@/lib/subscription-store";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const LAST_SYNC_KEY = "subtrack.cloud-sync.last-sync.v1";
+const PENDING_VERIFICATION_EMAIL_KEY = "subtrack.cloud-sync.pending-verification-email.v1";
 const WEB_AUTH_ORIGIN = "https://subtrackdash-k768wbpy.manus.space";
 
 function authRedirectUrl(path: "cloud-sync" | "password-reset") {
@@ -16,10 +18,10 @@ function authRedirectUrl(path: "cloud-sync" | "password-reset") {
 }
 
 function authError(error: unknown) {
-  const code = typeof error === "object" && error ? (error as { code?: string }).code : undefined;
-  if (code === "over_email_send_rate_limit") return new Error("Supabase’s temporary email service has reached its sending limit. Wait for the limit to reset, then try again, or configure custom SMTP before inviting users.");
-  return error;
+  return new Error(getCloudAuthErrorMessage(error));
 }
+
+export { getAuthCallbackMessage, getCloudAuthErrorMessage, getSessionTokensFromAuthUrl } from "@/lib/cloud-sync-auth-utils";
 
 interface CloudSyncValue {
   isConfigured: boolean;
@@ -27,9 +29,14 @@ interface CloudSyncValue {
   userEmail?: string;
   profileName?: string;
   needsProfileSetup: boolean;
+  verificationPendingEmail?: string;
+  authCallbackMessage?: string;
   lastSyncAt?: string;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<boolean>;
+  resendVerification: () => Promise<void>;
+  clearVerificationPending: () => Promise<void>;
+  clearAuthCallbackMessage: () => void;
   requestPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   updateProfile: (fullName: string) => Promise<void>;
@@ -44,19 +51,20 @@ function asError(error: unknown) {
   return error instanceof Error ? error : new Error("Cloud sync could not be completed. Please try again.");
 }
 
-export function getSessionTokensFromAuthUrl(url: string) {
-  const fragment = url.split("#")[1] ?? "";
-  const params = new URLSearchParams(fragment);
-  const accessToken = params.get("access_token");
-  const refreshToken = params.get("refresh_token");
-  return accessToken && refreshToken ? { accessToken, refreshToken } : null;
-}
-
 export function CloudSyncProvider({ children }: PropsWithChildren) {
   const { subscriptions, settings, householdMembers, replaceLocalSnapshot } = useSubscriptions();
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured);
   const [lastSyncAt, setLastSyncAt] = useState<string | undefined>();
+  const [verificationPendingEmail, setVerificationPendingEmail] = useState<string | undefined>();
+  const [authCallbackMessage, setAuthCallbackMessage] = useState<string | undefined>();
+
+  const clearVerificationPending = useCallback(async () => {
+    setVerificationPendingEmail(undefined);
+    await AsyncStorage.removeItem(PENDING_VERIFICATION_EMAIL_KEY);
+  }, []);
+
+  const clearAuthCallbackMessage = useCallback(() => setAuthCallbackMessage(undefined), []);
 
   useEffect(() => {
     if (!supabase) {
@@ -64,51 +72,95 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
       return;
     }
     const client = supabase;
-
     let mounted = true;
-    void Promise.all([client.auth.getSession(), AsyncStorage.getItem(LAST_SYNC_KEY)]).then(([sessionResult, storedLastSync]) => {
+
+    void Promise.all([
+      client.auth.getSession(),
+      AsyncStorage.getItem(LAST_SYNC_KEY),
+      AsyncStorage.getItem(PENDING_VERIFICATION_EMAIL_KEY),
+    ]).then(([sessionResult, storedLastSync, storedPendingEmail]) => {
       if (!mounted) return;
       setSession(sessionResult.data.session);
       setLastSyncAt(storedLastSync ?? undefined);
+      setVerificationPendingEmail(sessionResult.data.session ? undefined : storedPendingEmail ?? undefined);
       setIsLoading(false);
     });
 
     const applyAuthUrl = async (url: string | null) => {
       if (!url) return;
+      const callbackMessage = getAuthCallbackMessage(url);
+      if (callbackMessage) {
+        if (mounted) setAuthCallbackMessage(callbackMessage);
+        return;
+      }
       const tokens = getSessionTokensFromAuthUrl(url);
       if (!tokens) return;
-      const { data } = await client.auth.setSession({ access_token: tokens.accessToken, refresh_token: tokens.refreshToken });
+      const { data, error } = await client.auth.setSession({ access_token: tokens.accessToken, refresh_token: tokens.refreshToken });
+      if (error) {
+        if (mounted) setAuthCallbackMessage(getCloudAuthErrorMessage(error));
+        return;
+      }
       if (mounted) setSession(data.session);
+      if (data.session) void clearVerificationPending();
     };
+
     void Linking.getInitialURL().then(applyAuthUrl);
     const linkingSubscription = Linking.addEventListener("url", ({ url }) => void applyAuthUrl(url));
-
     const { data } = client.auth.onAuthStateChange((_event, nextSession) => {
       if (mounted) setSession(nextSession);
+      if (nextSession) void clearVerificationPending();
     });
+
     return () => {
       mounted = false;
       data.subscription.unsubscribe();
       linkingSubscription.remove();
     };
-  }, []);
+  }, [clearVerificationPending]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabase) throw new Error("Cloud sync is not configured for this build.");
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    if (error) throw error;
-  }, []);
+    const normalizedEmail = email.trim().toLowerCase();
+    const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+    if (error) {
+      const message = getCloudAuthErrorMessage(error);
+      if (message.includes("Confirm your email")) {
+        setVerificationPendingEmail(normalizedEmail);
+        await AsyncStorage.setItem(PENDING_VERIFICATION_EMAIL_KEY, normalizedEmail);
+      }
+      throw new Error(message);
+    }
+    await clearVerificationPending();
+  }, [clearVerificationPending]);
 
   const signUp = useCallback(async (email: string, password: string) => {
     if (!supabase) throw new Error("Cloud sync is not configured for this build.");
+    const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: normalizedEmail,
       password,
       options: { emailRedirectTo: authRedirectUrl("cloud-sync") },
     });
     if (error) throw authError(error);
-    return !data.session;
-  }, []);
+    if (!data.session) {
+      setVerificationPendingEmail(normalizedEmail);
+      await AsyncStorage.setItem(PENDING_VERIFICATION_EMAIL_KEY, normalizedEmail);
+      return true;
+    }
+    await clearVerificationPending();
+    return false;
+  }, [clearVerificationPending]);
+
+  const resendVerification = useCallback(async () => {
+    if (!supabase) throw new Error("Cloud sync is not configured for this build.");
+    if (!verificationPendingEmail) throw new Error("Start by creating an account with the email you want to verify.");
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: verificationPendingEmail,
+      options: { emailRedirectTo: authRedirectUrl("cloud-sync") },
+    });
+    if (error) throw authError(error);
+  }, [verificationPendingEmail]);
 
   const requestPasswordReset = useCallback(async (email: string) => {
     if (!supabase) throw new Error("Cloud sync is not configured for this build.");
@@ -119,7 +171,7 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
   const updatePassword = useCallback(async (password: string) => {
     if (!supabase) throw new Error("Cloud sync is not configured for this build.");
     const { error } = await supabase.auth.updateUser({ password });
-    if (error) throw error;
+    if (error) throw authError(error);
   }, []);
 
   const updateProfile = useCallback(async (fullName: string) => {
@@ -127,7 +179,7 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
     const normalized = fullName.trim().replace(/\s+/g, " ");
     if (!normalized) throw new Error("Enter a name to finish setting up your profile.");
     const { error } = await supabase.auth.updateUser({ data: { full_name: normalized } });
-    if (error) throw error;
+    if (error) throw authError(error);
     const { data } = await supabase.auth.getSession();
     setSession(data.session);
   }, []);
@@ -135,7 +187,7 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
   const signOut = useCallback(async () => {
     if (!supabase) return;
     const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    if (error) throw authError(error);
     setLastSyncAt(undefined);
     await AsyncStorage.removeItem(LAST_SYNC_KEY);
   }, []);
@@ -178,16 +230,21 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
     userEmail: session?.user.email,
     profileName: typeof session?.user.user_metadata?.full_name === "string" ? session.user.user_metadata.full_name : undefined,
     needsProfileSetup: Boolean(session && !session.user.user_metadata?.full_name),
+    verificationPendingEmail,
+    authCallbackMessage,
     lastSyncAt,
     signIn,
     signUp,
+    resendVerification,
+    clearVerificationPending,
+    clearAuthCallbackMessage,
     requestPasswordReset,
     updatePassword,
     updateProfile,
     signOut,
     syncNow,
     restoreFromCloud,
-  }), [isLoading, lastSyncAt, requestPasswordReset, restoreFromCloud, session?.user.email, session?.user.user_metadata?.full_name, signIn, signOut, signUp, syncNow, updatePassword, updateProfile]);
+  }), [authCallbackMessage, clearAuthCallbackMessage, clearVerificationPending, isLoading, lastSyncAt, requestPasswordReset, resendVerification, restoreFromCloud, session?.user.email, session?.user.user_metadata?.full_name, signIn, signOut, signUp, syncNow, updatePassword, updateProfile, verificationPendingEmail]);
 
   return <CloudSyncContext.Provider value={value}>{children}</CloudSyncContext.Provider>;
 }

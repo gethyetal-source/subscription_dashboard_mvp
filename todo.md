@@ -220,3 +220,8 @@
 - [x] Supervise clean Metro exits so they restart without terminating the development stack
 
 - [x] Audit the full SubTrack experience and list user-facing issues without implementing changes
+
+- [x] Add a visible account/profile entry point and editable cloud-profile details
+- [x] Add a persistent email-verification pending state with resend and recovery guidance
+- [x] Add clear, friendly authentication error and callback recovery states
+- [x] Add deterministic coverage for the account and verification milestone
