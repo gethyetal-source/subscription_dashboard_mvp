@@ -208,3 +208,7 @@
 - [x] Fix the deployed web callback route returning Cannot GET for Supabase email links
 
 - [x] Repair the production build artifact expected at dist/index.js and restore the public deployment
+
+- [x] Diagnose and restore the development preview after the repeated unavailable-server reports
+
+- [x] Research recent firsthand subscription-management problems and identify privacy-first SubTrack opportunities
