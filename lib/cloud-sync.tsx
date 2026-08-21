@@ -4,7 +4,7 @@ import * as Linking from "expo-linking";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { Platform } from "react-native";
 
-import { getAuthCallbackMessage, getCloudAuthErrorMessage, getSessionTokensFromAuthUrl } from "@/lib/cloud-sync-auth-utils";
+import { getAuthCallbackMessage, getCloudAuthErrorMessage, getSessionTokensFromAuthUrl, normalizeCloudEmail } from "@/lib/cloud-sync-auth-utils";
 import { isCloudSnapshot, prepareCloudSnapshot } from "@/lib/cloud-sync-utils";
 import { useSubscriptions } from "@/lib/subscription-store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
@@ -29,6 +29,7 @@ interface CloudSyncValue {
   userEmail?: string;
   profileName?: string;
   needsProfileSetup: boolean;
+  pendingEmailChange?: string;
   verificationPendingEmail?: string;
   authCallbackMessage?: string;
   lastSyncAt?: string;
@@ -40,6 +41,8 @@ interface CloudSyncValue {
   requestPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   updateProfile: (fullName: string) => Promise<void>;
+  updateEmail: (email: string) => Promise<void>;
+  resendEmailChange: () => Promise<void>;
   signOut: () => Promise<void>;
   syncNow: () => Promise<void>;
   restoreFromCloud: () => Promise<boolean>;
@@ -51,6 +54,11 @@ function asError(error: unknown) {
   return error instanceof Error ? error : new Error("Cloud sync could not be completed. Please try again.");
 }
 
+function pendingEmailFromUser(user?: Session["user"] | null) {
+  const candidate = user as (Session["user"] & { new_email?: unknown }) | null | undefined;
+  return typeof candidate?.new_email === "string" && candidate.new_email.trim() ? candidate.new_email : undefined;
+}
+
 export function CloudSyncProvider({ children }: PropsWithChildren) {
   const { subscriptions, settings, householdMembers, replaceLocalSnapshot } = useSubscriptions();
   const [session, setSession] = useState<Session | null>(null);
@@ -58,6 +66,7 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
   const [lastSyncAt, setLastSyncAt] = useState<string | undefined>();
   const [verificationPendingEmail, setVerificationPendingEmail] = useState<string | undefined>();
   const [authCallbackMessage, setAuthCallbackMessage] = useState<string | undefined>();
+  const [pendingEmailChange, setPendingEmailChange] = useState<string | undefined>();
 
   const clearVerificationPending = useCallback(async () => {
     setVerificationPendingEmail(undefined);
@@ -83,6 +92,7 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
       setSession(sessionResult.data.session);
       setLastSyncAt(storedLastSync ?? undefined);
       setVerificationPendingEmail(sessionResult.data.session ? undefined : storedPendingEmail ?? undefined);
+      setPendingEmailChange(pendingEmailFromUser(sessionResult.data.session?.user));
       setIsLoading(false);
     });
 
@@ -101,6 +111,7 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
         return;
       }
       if (mounted) setSession(data.session);
+      if (mounted) setPendingEmailChange(pendingEmailFromUser(data.session?.user));
       if (data.session) void clearVerificationPending();
     };
 
@@ -108,6 +119,7 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
     const linkingSubscription = Linking.addEventListener("url", ({ url }) => void applyAuthUrl(url));
     const { data } = client.auth.onAuthStateChange((_event, nextSession) => {
       if (mounted) setSession(nextSession);
+      if (mounted) setPendingEmailChange(pendingEmailFromUser(nextSession?.user));
       if (nextSession) void clearVerificationPending();
     });
 
@@ -184,6 +196,33 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
     setSession(data.session);
   }, []);
 
+  const updateEmail = useCallback(async (email: string) => {
+    if (!supabase || !session?.user.email) throw new Error("Sign in before changing your email address.");
+    const normalizedEmail = normalizeCloudEmail(email);
+    if (normalizedEmail === session.user.email.toLowerCase()) {
+      throw new Error("Enter a different email address to make a change.");
+    }
+    const { data, error } = await supabase.auth.updateUser(
+      { email: normalizedEmail },
+      { emailRedirectTo: authRedirectUrl("cloud-sync") },
+    );
+    if (error) throw authError(error);
+    const nextSession = await supabase.auth.getSession();
+    setSession(nextSession.data.session);
+    const changedImmediately = data.user?.email?.toLowerCase() === normalizedEmail && !pendingEmailFromUser(data.user as Session["user"]);
+    setPendingEmailChange(changedImmediately ? undefined : normalizedEmail);
+  }, [session?.user.email]);
+
+  const resendEmailChange = useCallback(async () => {
+    if (!supabase || !pendingEmailChange) throw new Error("Start an email change before requesting another confirmation link.");
+    const { error } = await supabase.auth.resend({
+      type: "email_change",
+      email: pendingEmailChange,
+      options: { emailRedirectTo: authRedirectUrl("cloud-sync") },
+    });
+    if (error) throw authError(error);
+  }, [pendingEmailChange]);
+
   const signOut = useCallback(async () => {
     if (!supabase) return;
     const { error } = await supabase.auth.signOut();
@@ -230,6 +269,7 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
     userEmail: session?.user.email,
     profileName: typeof session?.user.user_metadata?.full_name === "string" ? session.user.user_metadata.full_name : undefined,
     needsProfileSetup: Boolean(session && !session.user.user_metadata?.full_name),
+    pendingEmailChange,
     verificationPendingEmail,
     authCallbackMessage,
     lastSyncAt,
@@ -241,10 +281,12 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
     requestPasswordReset,
     updatePassword,
     updateProfile,
+    updateEmail,
+    resendEmailChange,
     signOut,
     syncNow,
     restoreFromCloud,
-  }), [authCallbackMessage, clearAuthCallbackMessage, clearVerificationPending, isLoading, lastSyncAt, requestPasswordReset, resendVerification, restoreFromCloud, session?.user.email, session?.user.user_metadata?.full_name, signIn, signOut, signUp, syncNow, updatePassword, updateProfile, verificationPendingEmail]);
+  }), [authCallbackMessage, clearAuthCallbackMessage, clearVerificationPending, isLoading, lastSyncAt, pendingEmailChange, requestPasswordReset, resendEmailChange, resendVerification, restoreFromCloud, session?.user.email, session?.user.user_metadata?.full_name, signIn, signOut, signUp, syncNow, updateEmail, updatePassword, updateProfile, verificationPendingEmail]);
 
   return <CloudSyncContext.Provider value={value}>{children}</CloudSyncContext.Provider>;
 }

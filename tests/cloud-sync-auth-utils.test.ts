@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getAuthCallbackMessage, getCloudAuthErrorMessage, getSessionTokensFromAuthUrl } from "../lib/cloud-sync-auth-utils";
+import { getAuthCallbackMessage, getCloudAuthErrorMessage, getSessionTokensFromAuthUrl, normalizeCloudEmail } from "../lib/cloud-sync-auth-utils";
 
 describe("cloud account callback and error guidance", () => {
   it("reads Supabase session tokens from an email-link fragment", () => {
@@ -18,5 +18,10 @@ describe("cloud account callback and error guidance", () => {
     expect(getCloudAuthErrorMessage({ code: "email_not_confirmed" })).toContain("Confirm your email");
     expect(getCloudAuthErrorMessage({ code: "over_email_send_rate_limit" })).toContain("could not send another email");
     expect(getCloudAuthErrorMessage({ message: "Invalid login credentials" })).toContain("did not match");
+  });
+
+  it("normalizes safe email-change input and rejects invalid values", () => {
+    expect(normalizeCloudEmail("  ALEX@EXAMPLE.COM ")).toBe("alex@example.com");
+    expect(() => normalizeCloudEmail("not-an-email")).toThrow("valid email address");
   });
 });

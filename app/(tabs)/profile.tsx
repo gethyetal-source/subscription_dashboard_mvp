@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
+import { normalizeCloudEmail } from "@/lib/cloud-sync-auth-utils";
 import { useCloudSync } from "@/lib/cloud-sync";
 import { useThemeContext } from "@/lib/theme-provider";
 
@@ -16,11 +17,13 @@ function initials(name?: string, email?: string) {
 export default function ProfileScreen() {
   const { colorScheme } = useThemeContext();
   const styles = useMemo(() => makeStyles(colorScheme === "dark"), [colorScheme]);
-  const { isConfigured, isLoading, userEmail, profileName, needsProfileSetup, updateProfile, signOut } = useCloudSync();
+  const { isConfigured, isLoading, userEmail, profileName, needsProfileSetup, pendingEmailChange, updateProfile, updateEmail, resendEmailChange, signOut } = useCloudSync();
   const [name, setName] = useState(profileName ?? "");
+  const [emailInput, setEmailInput] = useState(userEmail ?? "");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => setName(profileName ?? ""), [profileName]);
+  useEffect(() => setEmailInput(userEmail ?? ""), [userEmail]);
 
   const saveProfile = async () => {
     try {
@@ -29,6 +32,31 @@ export default function ProfileScreen() {
       Alert.alert("Profile saved", "Your display name is updated for this SubTrack cloud account.");
     } catch (error) {
       Alert.alert("Profile", error instanceof Error ? error.message : "We could not save your profile. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveEmail = async () => {
+    try {
+      setBusy(true);
+      const normalizedEmail = normalizeCloudEmail(emailInput);
+      await updateEmail(normalizedEmail);
+      Alert.alert("Check your inbox", "We sent an email-change confirmation link. Open the newest link to finish changing the sign-in email for this account.");
+    } catch (error) {
+      Alert.alert("Email address", error instanceof Error ? error.message : "We could not begin that email change. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resendEmailConfirmation = async () => {
+    try {
+      setBusy(true);
+      await resendEmailChange();
+      Alert.alert("Confirmation resent", "We sent a fresh email-change confirmation link. Open the newest link from your inbox.");
+    } catch (error) {
+      Alert.alert("Email address", error instanceof Error ? error.message : "We could not resend the confirmation. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -64,8 +92,14 @@ export default function ProfileScreen() {
     </View>
     <View style={styles.card}>
       <Text style={styles.cardLabel}>CLOUD ACCOUNT</Text>
-      <Text style={styles.detailTitle}>Email address</Text><Text style={styles.detailBody}>{userEmail}</Text>
-      <Text style={styles.detailTitle}>Password and backup</Text><Text style={styles.detailBody}>Manage password recovery, sync, and restore options from Cloud sync.</Text>
+      <Text style={styles.detailTitle}>Sign-in email</Text>
+      <TextInput autoCapitalize="none" autoComplete="email" keyboardType="email-address" onChangeText={setEmailInput} placeholder="you@example.com" placeholderTextColor={styles.placeholder.color as string} style={styles.input} value={emailInput} />
+      <Text style={styles.detailBody}>Changing your email requires confirmation from the newest link we send. Keep using {userEmail} until confirmation is complete.</Text>
+      <Pressable disabled={busy} onPress={() => void saveEmail()} style={({ pressed }) => [styles.secondaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.secondaryButtonText}>{busy ? "Working…" : "Change sign-in email"}</Text></Pressable>
+      {pendingEmailChange ? <View style={styles.pendingEmail}><Text style={styles.pendingEmailTitle}>Confirmation waiting</Text><Text style={styles.pendingEmailBody}>We are waiting for {pendingEmailChange} to be confirmed. Check that inbox and spam folder, then open the newest link.</Text><Pressable disabled={busy} onPress={() => void resendEmailConfirmation()} style={({ pressed }) => [styles.pendingEmailAction, (pressed || busy) && styles.pressed]}><Text style={styles.pendingEmailActionText}>Resend confirmation</Text></Pressable></View> : null}
+      <Text style={styles.detailTitle}>Password</Text><Text style={styles.detailBody}>Set a new password while signed in, or use the same screen after opening a recovery email.</Text>
+      <Pressable onPress={() => router.push("/password-reset" as never)} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}><Text style={styles.secondaryButtonText}>Change password</Text></Pressable>
+      <Text style={styles.detailTitle}>Backup</Text><Text style={styles.detailBody}>Manual sync and restore choices are available from Cloud sync.</Text>
       <Pressable onPress={() => router.push("/cloud-sync" as never)} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}><Text style={styles.secondaryButtonText}>Manage cloud sync</Text></Pressable>
     </View>
     <Pressable onPress={confirmSignOut} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}><Text style={styles.signOutText}>Sign out of cloud sync</Text></Pressable>
@@ -73,7 +107,7 @@ export default function ProfileScreen() {
 }
 
 function makeStyles(isDark: boolean) {
-  const palette = isDark ? { canvas: "#12160B", surface: "#191E0F", text: "#F4F2E8", muted: "#A8AD98", border: "#343A25", accent: "#C9F72D", accentText: "#172108", danger: "#FF9B8C", placeholder: "#78806C" } : { canvas: "#F4F3EB", surface: "#FFFEF8", text: "#20241A", muted: "#65695B", border: "#D9D9CC", accent: "#4A6510", accentText: "#F4F3EB", danger: "#B53A33", placeholder: "#7B7F70" };
+  const palette = isDark ? { canvas: "#12160B", surface: "#191E0F", text: "#F4F2E8", muted: "#A8AD98", border: "#343A25", accent: "#C9F72D", accentText: "#172108", danger: "#FF9B8C", placeholder: "#78806C", softAccent: "#28301B" } : { canvas: "#F4F3EB", surface: "#FFFEF8", text: "#20241A", muted: "#65695B", border: "#D9D9CC", accent: "#4A6510", accentText: "#F4F3EB", danger: "#B53A33", placeholder: "#7B7F70", softAccent: "#E5EDD2" };
   return StyleSheet.create({
     content: { paddingBottom: 34, paddingTop: 22 },
     center: { alignItems: "center", flex: 1, justifyContent: "center" },
@@ -93,11 +127,16 @@ function makeStyles(isDark: boolean) {
     helper: { color: palette.muted, fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 7 },
     detailTitle: { color: palette.text, fontFamily: type.semi, fontSize: 12, marginTop: 16 },
     detailBody: { color: palette.muted, fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 4 },
+    pendingEmail: { backgroundColor: palette.softAccent, borderColor: palette.border, borderRadius: 11, borderWidth: 1, marginTop: 14, padding: 12 },
+    pendingEmailTitle: { color: palette.text, fontFamily: type.semi, fontSize: 12 },
+    pendingEmailBody: { color: palette.muted, fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 4 },
+    pendingEmailAction: { alignSelf: "flex-start", justifyContent: "center", marginTop: 7, minHeight: 32 },
+    pendingEmailActionText: { color: palette.accent, fontFamily: type.semi, fontSize: 11 },
     primaryButton: { alignItems: "center", backgroundColor: palette.accent, borderRadius: 11, justifyContent: "center", marginTop: 20, minHeight: 48, paddingHorizontal: 16 },
     primaryButtonText: { color: palette.accentText, fontFamily: type.bold, fontSize: 13 },
     secondaryButton: { alignItems: "center", borderColor: palette.border, borderRadius: 11, borderWidth: 1, justifyContent: "center", marginTop: 18, minHeight: 46, paddingHorizontal: 16 },
     secondaryButtonText: { color: palette.text, fontFamily: type.semi, fontSize: 12 },
-    signOutButton: { alignItems: "center", marginTop: 22, minHeight: 40, justifyContent: "center" },
+    signOutButton: { alignItems: "center", justifyContent: "center", marginTop: 22, minHeight: 40 },
     signOutText: { color: palette.danger, fontFamily: type.semi, fontSize: 12 },
     loadingText: { color: palette.muted, fontFamily: type.regular, fontSize: 12, marginTop: 10 },
     loader: { color: palette.accent },

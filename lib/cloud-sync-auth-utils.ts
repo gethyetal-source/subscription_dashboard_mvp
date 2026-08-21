@@ -23,6 +23,14 @@ export function getSessionTokensFromAuthUrl(url: string) {
   return accessToken && refreshToken ? { accessToken, refreshToken } : null;
 }
 
+export function normalizeCloudEmail(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    throw new Error("Enter a valid email address, then try again.");
+  }
+  return normalized;
+}
+
 export function getCloudAuthErrorMessage(error: unknown) {
   const candidate = (error ?? {}) as CloudAuthErrorLike;
   const code = asText(candidate.code);
@@ -40,6 +48,9 @@ export function getCloudAuthErrorMessage(error: unknown) {
   }
   if (combined.includes("user_already_exists") || combined.includes("already registered")) {
     return "An account already exists for this email. Sign in or use password recovery instead.";
+  }
+  if (combined.includes("email_exists") || combined.includes("email already")) {
+    return "That email is already connected to another account. Use a different email address.";
   }
   if (combined.includes("otp_expired") || combined.includes("expired")) {
     return "This email link has expired. Request a fresh verification or password-reset email and open the newest link.";

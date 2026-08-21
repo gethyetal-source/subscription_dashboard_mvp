@@ -225,3 +225,8 @@
 - [x] Add a persistent email-verification pending state with resend and recovery guidance
 - [x] Add clear, friendly authentication error and callback recovery states
 - [x] Add deterministic coverage for the account and verification milestone
+
+- [x] Make cloud-account access discoverable from Settings and Profile
+- [x] Add a safe in-app cloud-account email-change flow with confirmation guidance
+- [x] Improve post-verification and password-management guidance from the account hub
+- [x] Add deterministic coverage for the second login and profile milestone
