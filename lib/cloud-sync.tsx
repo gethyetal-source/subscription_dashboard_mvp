@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { Platform } from "react-native";
 
 import { getAuthCallbackMessage, getCloudAuthErrorMessage, getSessionTokensFromAuthUrl, normalizeCloudEmail } from "@/lib/cloud-sync-auth-utils";
-import { isCloudSnapshot, prepareCloudSnapshot } from "@/lib/cloud-sync-utils";
+import { createCloudRestorePreview, isCloudSnapshot, prepareCloudSnapshot, type CloudRestorePreview } from "@/lib/cloud-sync-utils";
 import { useSubscriptions } from "@/lib/subscription-store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
@@ -45,6 +45,7 @@ interface CloudSyncValue {
   resendEmailChange: () => Promise<void>;
   signOut: () => Promise<void>;
   syncNow: () => Promise<void>;
+  getRestorePreview: () => Promise<CloudRestorePreview | null>;
   restoreFromCloud: () => Promise<boolean>;
 }
 
@@ -243,6 +244,19 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
     await AsyncStorage.setItem(LAST_SYNC_KEY, snapshot.syncedAt);
   }, [householdMembers, session?.user.id, settings, subscriptions]);
 
+  const getRestorePreview = useCallback(async () => {
+    if (!supabase || !session?.user.id) throw new Error("Sign in before reviewing a cloud backup.");
+    const { data, error } = await supabase
+      .from("subtrack_sync_state")
+      .select("payload, updated_at")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+    if (error) throw asError(error);
+    if (!data || !isCloudSnapshot(data.payload)) return null;
+    const snapshot = { ...data.payload, syncedAt: typeof data.updated_at === "string" ? data.updated_at : data.payload.syncedAt };
+    return createCloudRestorePreview(snapshot, { subscriptions, settings, householdMembers });
+  }, [householdMembers, session?.user.id, settings, subscriptions]);
+
   const restoreFromCloud = useCallback(async () => {
     if (!supabase || !session?.user.id) throw new Error("Sign in before restoring your data.");
     const { data, error } = await supabase
@@ -285,8 +299,9 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
     resendEmailChange,
     signOut,
     syncNow,
+    getRestorePreview,
     restoreFromCloud,
-  }), [authCallbackMessage, clearAuthCallbackMessage, clearVerificationPending, isLoading, lastSyncAt, pendingEmailChange, requestPasswordReset, resendEmailChange, resendVerification, restoreFromCloud, session?.user.email, session?.user.user_metadata?.full_name, signIn, signOut, signUp, syncNow, updateEmail, updatePassword, updateProfile, verificationPendingEmail]);
+  }), [authCallbackMessage, clearAuthCallbackMessage, clearVerificationPending, getRestorePreview, isLoading, lastSyncAt, pendingEmailChange, requestPasswordReset, resendEmailChange, resendVerification, restoreFromCloud, session?.user.email, session?.user.user_metadata?.full_name, signIn, signOut, signUp, syncNow, updateEmail, updatePassword, updateProfile, verificationPendingEmail]);
 
   return <CloudSyncContext.Provider value={value}>{children}</CloudSyncContext.Provider>;
 }

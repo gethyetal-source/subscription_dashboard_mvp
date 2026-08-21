@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isCloudSnapshot, prepareCloudSnapshot } from "../lib/cloud-sync-utils";
+import { createCloudRestorePreview, isCloudSnapshot, prepareCloudSnapshot } from "../lib/cloud-sync-utils";
 import type { LocalSubscriptionSnapshot } from "../lib/subscription-store";
 
 const snapshot: LocalSubscriptionSnapshot = {
@@ -47,5 +47,16 @@ describe("cloud snapshot safeguards", () => {
     expect(isCloudSnapshot(prepareCloudSnapshot(snapshot))).toBe(true);
     expect(isCloudSnapshot({ schemaVersion: 1, subscriptions: [] })).toBe(false);
     expect(isCloudSnapshot({ schemaVersion: 2, subscriptions: [], settings: {}, householdMembers: [] })).toBe(false);
+  });
+
+  it("summarizes cloud and local record counts before a destructive restore", () => {
+    const cloud = prepareCloudSnapshot(snapshot);
+    const local = { ...snapshot, subscriptions: [], householdMembers: [] };
+    const preview = createCloudRestorePreview(cloud, local);
+
+    expect(preview.cloudSubscriptionCount).toBe(1);
+    expect(preview.cloudActiveSubscriptionCount).toBe(1);
+    expect(preview.localSubscriptionCount).toBe(0);
+    expect(preview.localHouseholdMemberCount).toBe(0);
   });
 });

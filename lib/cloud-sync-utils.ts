@@ -5,6 +5,15 @@ export type CloudSnapshot = LocalSubscriptionSnapshot & {
   syncedAt: string;
 };
 
+export type CloudRestorePreview = {
+  syncedAt: string;
+  cloudSubscriptionCount: number;
+  cloudActiveSubscriptionCount: number;
+  cloudHouseholdMemberCount: number;
+  localSubscriptionCount: number;
+  localHouseholdMemberCount: number;
+};
+
 export function prepareCloudSnapshot(snapshot: LocalSubscriptionSnapshot): CloudSnapshot {
   return {
     schemaVersion: 1,
@@ -19,4 +28,15 @@ export function isCloudSnapshot(value: unknown): value is CloudSnapshot {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<CloudSnapshot>;
   return candidate.schemaVersion === 1 && Array.isArray(candidate.subscriptions) && Array.isArray(candidate.householdMembers) && Boolean(candidate.settings);
+}
+
+export function createCloudRestorePreview(cloud: CloudSnapshot, local: LocalSubscriptionSnapshot): CloudRestorePreview {
+  return {
+    syncedAt: cloud.syncedAt,
+    cloudSubscriptionCount: cloud.subscriptions.length,
+    cloudActiveSubscriptionCount: cloud.subscriptions.filter((subscription) => subscription.status !== "cancelled").length,
+    cloudHouseholdMemberCount: cloud.householdMembers.length,
+    localSubscriptionCount: local.subscriptions.length,
+    localHouseholdMemberCount: local.householdMembers.length,
+  };
 }

@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 
 import { ScreenContainer } from "@/components/screen-container";
 import { useCloudSync } from "@/lib/cloud-sync";
+import type { CloudRestorePreview } from "@/lib/cloud-sync-utils";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
@@ -15,12 +16,13 @@ function formatTimestamp(value?: string) {
 }
 
 export default function CloudSyncScreen() {
-  const { isConfigured, isLoading, userEmail, profileName, needsProfileSetup, verificationPendingEmail, authCallbackMessage, lastSyncAt, signIn, signOut, signUp, resendVerification, clearVerificationPending, clearAuthCallbackMessage, requestPasswordReset, updateProfile, syncNow, restoreFromCloud } = useCloudSync();
+  const { isConfigured, isLoading, userEmail, profileName, needsProfileSetup, verificationPendingEmail, authCallbackMessage, lastSyncAt, signIn, signOut, signUp, resendVerification, clearVerificationPending, clearAuthCallbackMessage, requestPasswordReset, updateProfile, syncNow, getRestorePreview, restoreFromCloud } = useCloudSync();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [restorePreview, setRestorePreview] = useState<CloudRestorePreview | null>(null);
 
   useEffect(() => {
     if (verificationPendingEmail) setEmail(verificationPendingEmail);
@@ -83,10 +85,23 @@ export default function CloudSyncScreen() {
     });
   };
 
+  const reviewRestore = () => {
+    void run(async () => {
+      const preview = await getRestorePreview();
+      if (!preview) {
+        setRestorePreview(null);
+        Alert.alert("No cloud backup yet", "Sync this device first to create a cloud backup for this account.");
+        return;
+      }
+      setRestorePreview(preview);
+    });
+  };
+
   const handleRestore = () => {
+    if (!restorePreview) return;
     Alert.alert(
       "Replace this device’s data?",
-      "This downloads your latest cloud snapshot and replaces local subscriptions, household members, and settings on this device. Provider accounts are not affected.",
+      `This will replace ${restorePreview.localSubscriptionCount} local subscription${restorePreview.localSubscriptionCount === 1 ? "" : "s"} and ${restorePreview.localHouseholdMemberCount} household member${restorePreview.localHouseholdMemberCount === 1 ? "" : "s"} with the reviewed cloud backup. Provider accounts are not affected.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -133,10 +148,12 @@ export default function CloudSyncScreen() {
           <View style={styles.card}>
             <Text style={styles.cardLabel}>SIGNED IN</Text>
             <Text style={styles.accountEmail}>{userEmail}</Text>
-            <Text style={styles.cardBody}>{profileName ? `${profileName} · ` : ""}Last successful sync: {formatTimestamp(lastSyncAt)}.</Text>
+            {profileName ? <Text style={styles.cardBody}>{profileName}</Text> : null}
+            <Text style={profileName ? styles.statusSubcopy : styles.cardBody}>Last successful upload from this device: {formatTimestamp(lastSyncAt)}.</Text>
+            <Text style={styles.statusNote}>Cloud sync is manual. Local reminders and device notification permissions are not uploaded.</Text>
             <Pressable disabled={busy} onPress={() => router.push("/(tabs)/profile" as never)} style={({ pressed }) => [styles.secondaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.secondaryButtonText}>View and edit profile</Text></Pressable>
             <Pressable disabled={busy} onPress={() => void run(syncNow)} style={({ pressed }) => [styles.primaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.primaryButtonText}>{busy ? "Working…" : "Sync this device now"}</Text></Pressable>
-            <Pressable disabled={busy} onPress={handleRestore} style={({ pressed }) => [styles.secondaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.secondaryButtonText}>Restore cloud backup</Text></Pressable>
+            {restorePreview ? <View style={styles.restorePreview}><Text style={styles.restorePreviewTitle}>Backup ready to review</Text><Text style={styles.restorePreviewBody}>Saved {formatTimestamp(restorePreview.syncedAt)} · {restorePreview.cloudSubscriptionCount} subscription{restorePreview.cloudSubscriptionCount === 1 ? "" : "s"} ({restorePreview.cloudActiveSubscriptionCount} active) · {restorePreview.cloudHouseholdMemberCount} household member{restorePreview.cloudHouseholdMemberCount === 1 ? "" : "s"}.</Text><Text style={styles.restorePreviewWarning}>Restoring replaces the local subscription records, household members, and settings described above.</Text><Pressable disabled={busy} onPress={handleRestore} style={({ pressed }) => [styles.restoreButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.restoreButtonText}>Restore reviewed backup</Text></Pressable></View> : <Pressable disabled={busy} onPress={reviewRestore} style={({ pressed }) => [styles.secondaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.secondaryButtonText}>Review cloud backup before restoring</Text></Pressable>}
             <Pressable disabled={busy} onPress={() => void run(signOut)} style={({ pressed }) => [styles.textButton, (pressed || busy) && styles.pressed]}><Text style={styles.textButtonText}>Sign out of cloud sync</Text></Pressable>
           </View>
         ) : verificationPendingEmail ? (
@@ -188,12 +205,20 @@ const styles = StyleSheet.create({
   cardLabel: { color: "#C9F72D", fontFamily: type.semi, fontSize: 10, letterSpacing: 1.1 },
   accountEmail: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 15, marginTop: 8 },
   cardBody: { color: "#A8AD98", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 7 },
+  statusSubcopy: { color: "#A8AD98", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 2 },
+  statusNote: { color: "#89917A", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 8 },
   inputLabel: { color: "#D7DBC9", fontFamily: type.semi, fontSize: 11, marginTop: 16 },
   input: { backgroundColor: "#12160B", borderColor: "#3A4227", borderRadius: 10, borderWidth: 1, color: "#F4F2E8", fontFamily: type.regular, fontSize: 13, height: 46, marginTop: 7, paddingHorizontal: 12 },
   primaryButton: { alignItems: "center", backgroundColor: "#C9F72D", borderRadius: 11, justifyContent: "center", marginTop: 20, minHeight: 48, paddingHorizontal: 16 },
   primaryButtonText: { color: "#172108", fontFamily: type.bold, fontSize: 13 },
   secondaryButton: { alignItems: "center", borderColor: "#536238", borderRadius: 11, borderWidth: 1, justifyContent: "center", marginTop: 10, minHeight: 47, paddingHorizontal: 16 },
   secondaryButtonText: { color: "#E4E8D6", fontFamily: type.semi, fontSize: 13 },
+  restorePreview: { backgroundColor: "#202713", borderColor: "#485632", borderRadius: 12, borderWidth: 1, marginTop: 12, padding: 13 },
+  restorePreviewTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 12 },
+  restorePreviewBody: { color: "#C9D0B8", fontFamily: type.regular, fontSize: 11, lineHeight: 17, marginTop: 5 },
+  restorePreviewWarning: { color: "#FFCF9B", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 9 },
+  restoreButton: { alignItems: "center", borderColor: "#C59050", borderRadius: 10, borderWidth: 1, justifyContent: "center", marginTop: 12, minHeight: 44, paddingHorizontal: 14 },
+  restoreButtonText: { color: "#FFD5A8", fontFamily: type.semi, fontSize: 12 },
   textButton: { alignItems: "center", marginTop: 16, minHeight: 28 },
   textButtonText: { color: "#FF9B8C", fontFamily: type.semi, fontSize: 12 },
   linkButtonText: { color: "#C9F72D", fontFamily: type.semi, fontSize: 12 },
