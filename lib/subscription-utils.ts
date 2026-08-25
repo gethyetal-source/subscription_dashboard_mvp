@@ -197,6 +197,41 @@ export function getSavingsImpact(subscriptions: SubscriptionRecord[], selectedId
   return { monthly: Number(selected.reduce((sum, item) => sum + monthlyAmount(item.amount, item.cadence), 0).toFixed(2)), annual: Number(selected.reduce((sum, item) => sum + annualAmount(item.amount, item.cadence), 0).toFixed(2)) };
 }
 
+export interface ExpectedChargeContext {
+  expected: number;
+  savedAmount: number;
+  difference: number;
+  direction: "higher" | "lower" | "unchanged";
+  reason?: string;
+}
+
+/** Returns only user-entered local expectations; it never implies an invoice was checked. */
+export function getExpectedChargeContext(subscription: SubscriptionRecord): ExpectedChargeContext | undefined {
+  if (subscription.expectedNextCharge === undefined || !Number.isFinite(subscription.expectedNextCharge)) return undefined;
+  const difference = Number((subscription.expectedNextCharge - subscription.amount).toFixed(2));
+  return {
+    expected: subscription.expectedNextCharge,
+    savedAmount: subscription.amount,
+    difference,
+    direction: difference === 0 ? "unchanged" : difference > 0 ? "higher" : "lower",
+    reason: subscription.costChangeReason?.trim() || undefined,
+  };
+}
+
+export type CancellationEvidenceKind = "official-attempt" | "confirmation-reference" | "provider-end-date" | "follow-up" | "confirmed";
+export interface CancellationEvidenceEvent { id: string; kind: CancellationEvidenceKind; date: string; title: string; detail: string; }
+
+/** Builds a local evidence timeline. Entries are not provider verification or proof of a refund. */
+export function getCancellationEvidenceTimeline(subscription: SubscriptionRecord): CancellationEvidenceEvent[] {
+  const events: CancellationEvidenceEvent[] = [];
+  if (subscription.cancellationRequestedAt) events.push({ id: "official-attempt", kind: "official-attempt", date: subscription.cancellationRequestedAt, title: "Official request tracked", detail: "You recorded an official cancellation attempt." });
+  if (subscription.cancellationConfirmationReference) events.push({ id: "confirmation-reference", kind: "confirmation-reference", date: subscription.cancellationRequestedAt ?? subscription.updatedAt, title: "Local confirmation reference", detail: subscription.cancellationConfirmationReference });
+  if (subscription.cancellationExpectedEndDate) events.push({ id: "provider-end-date", kind: "provider-end-date", date: `${subscription.cancellationExpectedEndDate}T00:00:00.000Z`, title: "Provider-stated end date", detail: subscription.cancellationExpectedEndDate });
+  if (subscription.cancellationFollowUpDate) events.push({ id: "follow-up", kind: "follow-up", date: `${subscription.cancellationFollowUpDate}T00:00:00.000Z`, title: subscription.cancellationFollowUpCompletedAt ? "Follow-up completed" : "Follow up with provider", detail: subscription.cancellationFollowUpCompletedAt ? `Completed ${subscription.cancellationFollowUpCompletedAt}` : subscription.cancellationFollowUpDate });
+  if (subscription.cancellationConfirmedAt) events.push({ id: "confirmed", kind: "confirmed", date: subscription.cancellationConfirmedAt, title: "Cancellation marked confirmed", detail: "Marked locally after provider confirmation." });
+  return events.sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+}
+
 export interface CategorySpend { category: ServiceCategory | "Other"; monthly: number; percentage: number; subscriptionCount: number; }
 export interface SpendInsight { id: "empty" | "concentration" | "renewals" | "trial" | "currency"; title: string; body: string; subscriptionId?: string; }
 export interface SpendSummary { monthly: number; annual: number; activeCount: number; currency: string; currencyGroups: CurrencySpendGroup[]; hasMixedCurrencies: boolean; categories: CategorySpend[]; upcomingSevenDays: SubscriptionRecord[]; trials: SubscriptionRecord[]; insights: SpendInsight[]; }

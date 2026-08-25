@@ -54,6 +54,10 @@ export interface SubscriptionRecord {
   currency: string;
   cadence: BillingCadence;
   renewalDate: string;
+  /** User-entered amount expected at the next renewal, in this record's currency. */
+  expectedNextCharge?: number;
+  /** User-entered local context for an expected or observed price change. */
+  costChangeReason?: string;
   trialEndDate?: string;
   billingSource: BillingSource;
   /** A local label copied from a receipt, statement, wallet, or provider account. */
@@ -64,6 +68,13 @@ export interface SubscriptionRecord {
   cancellationState?: CancellationState;
   cancellationRequestedAt?: string;
   cancellationConfirmedAt?: string;
+  /** User-entered provider confirmation or case reference. */
+  cancellationConfirmationReference?: string;
+  /** User-entered end date stated by the provider. */
+  cancellationExpectedEndDate?: string;
+  /** Local date to check the provider outcome. */
+  cancellationFollowUpDate?: string;
+  cancellationFollowUpCompletedAt?: string;
   status: SubscriptionStatus;
   notes?: string;
   reminderEnabled: boolean;
@@ -91,6 +102,8 @@ export interface SubscriptionDraft {
   currency: string;
   cadence: BillingCadence;
   renewalDate: string;
+  expectedNextCharge?: number;
+  costChangeReason?: string;
   trialEndDate?: string;
   billingSource: BillingSource;
   billingIdentity?: string;
@@ -98,6 +111,10 @@ export interface SubscriptionDraft {
   cancellationState?: CancellationState;
   cancellationRequestedAt?: string;
   cancellationConfirmedAt?: string;
+  cancellationConfirmationReference?: string;
+  cancellationExpectedEndDate?: string;
+  cancellationFollowUpDate?: string;
+  cancellationFollowUpCompletedAt?: string;
   status: SubscriptionStatus;
   notes?: string;
   reminderEnabled: boolean;

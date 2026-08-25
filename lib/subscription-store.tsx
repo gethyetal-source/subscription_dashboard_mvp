@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { cancelRenewalReminder, scheduleRenewalReminder } from "@/lib/reminders";
 import type { AppSettings, HouseholdMember, SubscriptionDraft, SubscriptionRecord } from "@/lib/subscription-types";
+import { nextLocalDateKey } from "@/lib/subscription-utils";
 
 const STORAGE_KEY = "subtrack.mvp.local-state.v1";
 
@@ -166,7 +167,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       let updated = {
         ...current,
         status,
-        ...(shouldClearFollowUp ? { cancellationState: "none" as const, cancellationRequestedAt: undefined, cancellationConfirmedAt: undefined } : {}),
+        ...(shouldClearFollowUp ? { cancellationState: "none" as const, cancellationRequestedAt: undefined, cancellationConfirmedAt: undefined, cancellationConfirmationReference: undefined, cancellationExpectedEndDate: undefined, cancellationFollowUpDate: undefined, cancellationFollowUpCompletedAt: undefined } : {}),
         updatedAt: new Date().toISOString(),
       };
       if (status !== "cancelled" && settings.notificationsEnabled && !updated.reminderIdentifier) {
@@ -186,6 +187,8 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       cancellationState: "pending",
       cancellationRequestedAt: new Date().toISOString(),
       cancellationConfirmedAt: undefined,
+      cancellationFollowUpDate: nextLocalDateKey(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+      cancellationFollowUpCompletedAt: undefined,
       updatedAt: new Date().toISOString(),
     };
     await persist(subscriptions.map((item) => (item.id === id ? updated : item)), settings);
@@ -200,6 +203,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       status: "cancelled",
       cancellationState: "confirmed",
       cancellationConfirmedAt: new Date().toISOString(),
+      cancellationFollowUpCompletedAt: new Date().toISOString(),
       reminderIdentifier: undefined,
       updatedAt: new Date().toISOString(),
     };

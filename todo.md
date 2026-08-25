@@ -238,3 +238,9 @@
 - [x] Prevent mixed-currency totals from being presented as a single comparable spend amount
 - [x] Add catalog freshness, regional-price, and user-correction safeguards
 - [x] Add deterministic coverage for currency and catalog-accuracy safeguards
+
+- [x] Add expected next-charge, variance, and cost-change-reason fields to local subscription records
+- [x] Add expected-charge review context to subscription entry and detail screens
+- [x] Add a chronological cancellation evidence timeline with official-attempt and follow-up context
+- [x] Add deterministic coverage for expected-charge and cancellation-evidence safeguards
+- [x] Run comprehensive validation across all newly implemented features
