@@ -244,3 +244,5 @@
 - [x] Add a chronological cancellation evidence timeline with official-attempt and follow-up context
 - [x] Add deterministic coverage for expected-charge and cancellation-evidence safeguards
 - [x] Run comprehensive validation across all newly implemented features
+
+- [x] Research current user-reported subscription-management needs and deliver a prioritized privacy-first feature catalogue
