@@ -252,3 +252,8 @@
 - [x] Add a privacy-first charge-recognition worksheet with official support paths
 - [x] Add deterministic coverage for the Subscription Decision System
 - [x] Run comprehensive validation for the decision-support milestone
+
+- [x] Assess official-price source reliability, regional variance, and safe weekly-refresh architecture
+- [x] Implement an approved weekly catalog-price refresh workflow with source and review safeguards
+- [x] Define the India/INR official-source price-report policy and structured change-record format
+- [x] Configure and validate the recurring weekly India catalog price-change research report
