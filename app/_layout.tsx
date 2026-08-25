@@ -117,6 +117,8 @@ export default function RootLayout() {
                 <Stack.Screen name="subscription/edit" options={{ presentation: "modal" }} />
                 <Stack.Screen name="household" />
                 <Stack.Screen name="control-center" />
+                <Stack.Screen name="decision-plan" />
+                <Stack.Screen name="charge-recognition" />
                 <Stack.Screen name="cloud-sync" />
                 <Stack.Screen name="password-reset" />
                 <Stack.Screen name="oauth/callback" />

@@ -246,3 +246,9 @@
 - [x] Run comprehensive validation across all newly implemented features
 
 - [x] Research current user-reported subscription-management needs and deliver a prioritized privacy-first feature catalogue
+
+- [x] Add backward-compatible local decision-plan, intent-tag, and value-check-in data to subscriptions
+- [x] Add renewal decision controls and local value check-ins to subscription management
+- [x] Add a privacy-first charge-recognition worksheet with official support paths
+- [x] Add deterministic coverage for the Subscription Decision System
+- [x] Run comprehensive validation for the decision-support milestone

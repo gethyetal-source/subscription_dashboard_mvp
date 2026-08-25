@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 
 import { cancelRenewalReminder, scheduleRenewalReminder } from "@/lib/reminders";
-import type { AppSettings, HouseholdMember, SubscriptionDraft, SubscriptionRecord } from "@/lib/subscription-types";
+import type { AppSettings, ChargeRecognitionCase, ChargeRecognitionDraft, HouseholdMember, SubscriptionDraft, SubscriptionRecord } from "@/lib/subscription-types";
 import { nextLocalDateKey } from "@/lib/subscription-utils";
 
 const STORAGE_KEY = "subtrack.mvp.local-state.v1";
@@ -11,6 +11,7 @@ interface StoredState {
   subscriptions: SubscriptionRecord[];
   settings: AppSettings;
   householdMembers?: HouseholdMember[];
+  chargeRecognitionCases?: ChargeRecognitionCase[];
 }
 
 export interface LocalSubscriptionSnapshot {
@@ -51,8 +52,10 @@ interface SubscriptionStoreValue {
   subscriptions: SubscriptionRecord[];
   settings: AppSettings;
   householdMembers: HouseholdMember[];
+  chargeRecognitionCases: ChargeRecognitionCase[];
   addSubscription: (draft: SubscriptionDraft) => Promise<SubscriptionRecord>;
   updateSubscription: (id: string, draft: SubscriptionDraft) => Promise<SubscriptionRecord | undefined>;
+  updateDecisionSupport: (id: string, patch: Pick<SubscriptionRecord, "intentTags" | "renewalDecisionPlan" | "valueCheckIn">) => Promise<void>;
   updateStatus: (id: string, status: SubscriptionRecord["status"]) => Promise<void>;
   beginCancellationFollowUp: (id: string) => Promise<void>;
   confirmCancellation: (id: string) => Promise<void>;
@@ -63,6 +66,8 @@ interface SubscriptionStoreValue {
   removeHouseholdMember: (id: string) => Promise<void>;
   replaceLocalSnapshot: (snapshot: LocalSubscriptionSnapshot) => Promise<void>;
   resetLocalData: () => Promise<void>;
+  saveChargeRecognitionCase: (draft: ChargeRecognitionDraft) => Promise<ChargeRecognitionCase>;
+  deleteChargeRecognitionCase: (id: string) => Promise<void>;
 }
 
 const SubscriptionStore = createContext<SubscriptionStoreValue | undefined>(undefined);
@@ -72,6 +77,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
   const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([]);
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([ownerMember]);
+  const [chargeRecognitionCases, setChargeRecognitionCases] = useState<ChargeRecognitionCase[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -89,6 +95,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
           ...item,
           sharedMemberIds: normalizeSharedMemberIds(item.sharedMemberIds, nextMembers),
         })));
+        setChargeRecognitionCases((parsed.chargeRecognitionCases ?? []).filter((item) => item.merchantLabel?.trim()));
         setSettings({ ...defaultSettings, ...(parsed.settings ?? {}) });
       })
       .catch(() => {
@@ -105,12 +112,13 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  const persist = useCallback(async (nextSubscriptions: SubscriptionRecord[], nextSettings: AppSettings, nextMembers = householdMembers) => {
+  const persist = useCallback(async (nextSubscriptions: SubscriptionRecord[], nextSettings: AppSettings, nextMembers = householdMembers, nextChargeRecognitionCases = chargeRecognitionCases) => {
     setSubscriptions(nextSubscriptions);
     setSettings(nextSettings);
     setHouseholdMembers(nextMembers);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ subscriptions: nextSubscriptions, settings: nextSettings, householdMembers: nextMembers } satisfies StoredState));
-  }, [householdMembers]);
+    setChargeRecognitionCases(nextChargeRecognitionCases);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ subscriptions: nextSubscriptions, settings: nextSettings, householdMembers: nextMembers, chargeRecognitionCases: nextChargeRecognitionCases } satisfies StoredState));
+  }, [chargeRecognitionCases, householdMembers]);
 
   const addSubscription = useCallback(
     async (draft: SubscriptionDraft) => {
@@ -177,6 +185,13 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
     },
     [persist, settings, subscriptions],
   );
+
+  const updateDecisionSupport = useCallback(async (id: string, patch: Pick<SubscriptionRecord, "intentTags" | "renewalDecisionPlan" | "valueCheckIn">) => {
+    const current = subscriptions.find((item) => item.id === id);
+    if (!current) return;
+    const updated: SubscriptionRecord = { ...current, ...patch, updatedAt: new Date().toISOString() };
+    await persist(subscriptions.map((item) => (item.id === id ? updated : item)), settings);
+  }, [persist, settings, subscriptions]);
 
   const beginCancellationFollowUp = useCallback(async (id: string) => {
     const current = subscriptions.find((item) => item.id === id);
@@ -308,11 +323,32 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
     setSubscriptions([]);
     setSettings(defaultSettings);
     setHouseholdMembers([ownerMember]);
+    setChargeRecognitionCases([]);
   }, [subscriptions]);
 
+  const saveChargeRecognitionCase = useCallback(async (draft: ChargeRecognitionDraft) => {
+    const now = new Date().toISOString();
+    const record: ChargeRecognitionCase = {
+      ...draft,
+      merchantLabel: draft.merchantLabel.trim(),
+      currency: draft.currency?.trim().toUpperCase() || undefined,
+      accountAlias: draft.accountAlias?.trim() || undefined,
+      notes: draft.notes?.trim() || undefined,
+      id: `charge_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await persist(subscriptions, settings, householdMembers, [record, ...chargeRecognitionCases]);
+    return record;
+  }, [chargeRecognitionCases, householdMembers, persist, settings, subscriptions]);
+
+  const deleteChargeRecognitionCase = useCallback(async (id: string) => {
+    await persist(subscriptions, settings, householdMembers, chargeRecognitionCases.filter((item) => item.id !== id));
+  }, [chargeRecognitionCases, householdMembers, persist, settings, subscriptions]);
+
   const value = useMemo(
-    () => ({ isReady, subscriptions, settings, householdMembers, addSubscription, updateSubscription, updateStatus, beginCancellationFollowUp, confirmCancellation, deleteSubscription, restoreSubscription, updateSettings, addHouseholdMember, removeHouseholdMember, replaceLocalSnapshot, resetLocalData }),
-    [addHouseholdMember, addSubscription, beginCancellationFollowUp, confirmCancellation, deleteSubscription, householdMembers, isReady, removeHouseholdMember, replaceLocalSnapshot, resetLocalData, restoreSubscription, settings, subscriptions, updateSettings, updateStatus, updateSubscription],
+    () => ({ isReady, subscriptions, settings, householdMembers, chargeRecognitionCases, addSubscription, updateSubscription, updateDecisionSupport, updateStatus, beginCancellationFollowUp, confirmCancellation, deleteSubscription, restoreSubscription, updateSettings, addHouseholdMember, removeHouseholdMember, replaceLocalSnapshot, resetLocalData, saveChargeRecognitionCase, deleteChargeRecognitionCase }),
+    [addHouseholdMember, addSubscription, beginCancellationFollowUp, chargeRecognitionCases, confirmCancellation, deleteChargeRecognitionCase, deleteSubscription, householdMembers, isReady, removeHouseholdMember, replaceLocalSnapshot, resetLocalData, restoreSubscription, saveChargeRecognitionCase, settings, subscriptions, updateDecisionSupport, updateStatus, updateSubscription],
   );
 
   return <SubscriptionStore.Provider value={value}>{children}</SubscriptionStore.Provider>;

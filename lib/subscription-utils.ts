@@ -1,5 +1,5 @@
 import { billingSourceMeta, getService } from "./catalog";
-import type { BillingCadence, HouseholdMember, ServiceCategory, SubscriptionRecord } from "./subscription-types";
+import type { BillingCadence, BillingSource, ChargeRecognitionDraft, HouseholdMember, RenewalDecisionAction, ServiceCategory, SubscriptionRecord } from "./subscription-types";
 
 const cadenceMonths: Record<BillingCadence, number> = { weekly: 0.23, monthly: 1, quarterly: 3, yearly: 12 };
 
@@ -116,6 +116,82 @@ export function getAttentionScore(subscription: SubscriptionRecord, reference = 
   if (monthly >= 50) score += 20;
   else if (monthly >= 20) score += 10;
   return Math.min(100, score);
+}
+
+export interface RenewalDecisionPrompt {
+  subscription: SubscriptionRecord;
+  dueInDays: number;
+  action?: RenewalDecisionAction;
+  title: string;
+  body: string;
+}
+
+/** Returns local decision prompts. It never assumes a provider-side plan change has happened. */
+export function getRenewalDecisionPrompts(subscriptions: SubscriptionRecord[], reference = new Date()): RenewalDecisionPrompt[] {
+  return subscriptions
+    .filter((item) => item.status !== "cancelled")
+    .map((subscription) => {
+      const decisionDate = subscription.status === "trial" ? subscription.trialEndDate ?? subscription.renewalDate : subscription.renewalDate;
+      const dueInDays = daysUntil(decisionDate, reference);
+      const action = subscription.renewalDecisionPlan?.action;
+      const serviceName = getService(subscription.serviceId)?.name ?? subscription.planName;
+      if (dueInDays < 0 || dueInDays > 30) return undefined;
+      if (!action) return { subscription, dueInDays, title: `Decide on ${serviceName}`, body: `Review your next ${formatCurrency(subscription.expectedNextCharge ?? subscription.amount, subscription.currency)} charge before ${formatDate(decisionDate)}.`, action };
+      return { subscription, dueInDays, title: `${serviceName}: ${action.replace("-", " ")}`, body: "You recorded this as a local decision. Use the official billing page if an external change is needed.", action };
+    })
+    .filter((item): item is RenewalDecisionPrompt => Boolean(item))
+    .sort((left, right) => left.dueInDays - right.dueInDays);
+}
+
+export interface ValueCheckPrompt { subscription: SubscriptionRecord; title: string; body: string; }
+
+export function getValueCheckPrompts(subscriptions: SubscriptionRecord[], reference = new Date()): ValueCheckPrompt[] {
+  const staleAfter = new Date(reference.getTime() - 90 * 24 * 60 * 60 * 1000).getTime();
+  return subscriptions.filter((item) => item.status !== "cancelled").flatMap((subscription) => {
+    const check = subscription.valueCheckIn;
+    const stale = !check || new Date(check.checkedAt).getTime() < staleAfter;
+    const lowValue = check?.useLevel === "rare" || check?.wouldBuyAgain === "no";
+    if (!stale && !lowValue) return [];
+    const name = getService(subscription.serviceId)?.name ?? subscription.planName;
+    return [{ subscription, title: lowValue ? `Reconsider ${name}` : `Check ${name}'s value`, body: lowValue ? "Your local check-in suggests this subscription may no longer be worth renewing." : "Record whether you still use it and would choose it again today." }];
+  });
+}
+
+export interface ChargeRecognitionMatch { subscription: SubscriptionRecord; score: number; reasons: string[]; }
+
+function normalizeRecognitionText(value: string | undefined) { return value?.trim().toLowerCase().replace(/[^a-z0-9]/g, "") ?? ""; }
+function recognitionTerms(value: string | undefined) { return (value?.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((term) => term !== "com" && term !== "www"); }
+
+/**
+ * Suggests only possible local matches using the user's own fields. It does not inspect financial data,
+ * identify a merchant, or assert that any suggestion is the charged service.
+ */
+export function getChargeRecognitionMatches(draft: Pick<ChargeRecognitionDraft, "merchantLabel" | "amount" | "currency" | "billingSource">, subscriptions: SubscriptionRecord[]): ChargeRecognitionMatch[] {
+  const merchant = normalizeRecognitionText(draft.merchantLabel);
+  const merchantTerms = recognitionTerms(draft.merchantLabel);
+  const currency = draft.currency?.toUpperCase();
+  return subscriptions.filter((item) => item.status !== "cancelled").map((subscription) => {
+    const reasons: string[] = [];
+    let score = 0;
+    const billingIdentity = normalizeRecognitionText(subscription.billingIdentity);
+    const billingTerms = recognitionTerms(subscription.billingIdentity);
+    const plan = normalizeRecognitionText(subscription.planName);
+    const service = normalizeRecognitionText(getService(subscription.serviceId)?.name);
+    if (merchant && billingIdentity && (billingIdentity.includes(merchant) || merchant.includes(billingIdentity) || (merchantTerms.length > 0 && merchantTerms.every((term) => billingTerms.includes(term))))) { score += 60; reasons.push("local billing label is similar"); }
+    if (merchant && (service.includes(merchant) || merchant.includes(service) || plan.includes(merchant) || merchant.includes(plan))) { score += 35; reasons.push("service or plan name is similar"); }
+    if (draft.billingSource !== "unknown" && subscription.billingSource === draft.billingSource) { score += 15; reasons.push("billing source matches"); }
+    if (draft.amount !== undefined && Number.isFinite(draft.amount) && Math.abs(subscription.amount - draft.amount) < 0.01 && (!currency || subscription.currency.toUpperCase() === currency)) { score += 25; reasons.push("amount and currency match"); }
+    return { subscription, score, reasons };
+  }).filter((match) => match.score > 0).sort((left, right) => right.score - left.score || left.subscription.renewalDate.localeCompare(right.subscription.renewalDate)).slice(0, 5);
+}
+
+export function getChargeRecognitionSupportCopy(source: BillingSource) {
+  if (source === "apple") return "Check your Apple purchase history and subscriptions, then use Apple’s official subscription page for the next step.";
+  if (source === "google") return "Check Google Play order history and subscriptions, then use Google Play’s official subscription page for the next step.";
+  if (source === "carrier") return "Check the carrier or bundle account that appears on your own statement or receipt before contacting its official support.";
+  if (source === "reseller") return "Check the marketplace or reseller shown on your own record, then use its official support route.";
+  if (source === "provider") return "Check the provider account or receipt you used to subscribe, then contact the provider through its official support route.";
+  return "Start with your own receipt, statement label, wallet activity, and account email. If the charge remains unknown, use the official support or unauthorized-charge route for the billing source you identify.";
 }
 
 export type SubscriptionControlIssueKind = "cancellation-follow-up" | "possible-duplicate" | "annual-renewal" | "trial-deadline" | "renewal-setting" | "billing-identity" | "billing-source" | "uncertain-status";

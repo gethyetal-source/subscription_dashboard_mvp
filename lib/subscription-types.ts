@@ -14,6 +14,25 @@ export type BillingCadence = "weekly" | "monthly" | "quarterly" | "yearly";
 export type DashboardSort = "upcoming" | "highest-cost";
 export type AutoRenewStatus = "on" | "off" | "unknown";
 export type CancellationState = "none" | "pending" | "confirmed";
+export type SubscriptionIntentTag = "essential" | "seasonal" | "work" | "learning" | "family" | "testing" | "backup";
+export type RenewalDecisionAction = "keep" | "downgrade" | "pause" | "cancel-officially" | "review-later";
+export type ValueUseLevel = "frequent" | "occasional" | "rare" | "unknown";
+export type ValueBuyAgain = "yes" | "maybe" | "no";
+export type ChargePaymentRail = "card" | "wallet" | "carrier" | "bank" | "unknown";
+
+export interface RenewalDecisionPlan {
+  action: RenewalDecisionAction;
+  /** A local note explaining the user's decision. */
+  note?: string;
+  decidedAt: string;
+}
+
+export interface ValueCheckIn {
+  useLevel: ValueUseLevel;
+  wouldBuyAgain: ValueBuyAgain;
+  note?: string;
+  checkedAt: string;
+}
 
 export interface HouseholdMember {
   id: string;
@@ -58,6 +77,12 @@ export interface SubscriptionRecord {
   expectedNextCharge?: number;
   /** User-entered local context for an expected or observed price change. */
   costChangeReason?: string;
+  /** User-selected purpose tags. These are local decision context, not provider metadata. */
+  intentTags?: SubscriptionIntentTag[];
+  /** User-entered decision for the next renewal. SubTrack never applies it at the provider. */
+  renewalDecisionPlan?: RenewalDecisionPlan;
+  /** User-entered worth check-in; this never tracks app usage or account activity. */
+  valueCheckIn?: ValueCheckIn;
   trialEndDate?: string;
   billingSource: BillingSource;
   /** A local label copied from a receipt, statement, wallet, or provider account. */
@@ -94,6 +119,35 @@ export interface AppSettings {
   monthlyBudget: number;
 }
 
+/** A local worksheet entry for a charge the user cannot yet recognize. */
+export interface ChargeRecognitionCase {
+  id: string;
+  merchantLabel: string;
+  amount?: number;
+  currency?: string;
+  chargeDate?: string;
+  billingSource: BillingSource;
+  paymentRail: ChargePaymentRail;
+  accountAlias?: string;
+  notes?: string;
+  /** A user-selected possible local match, never an automatic identification. */
+  matchedSubscriptionId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChargeRecognitionDraft {
+  merchantLabel: string;
+  amount?: number;
+  currency?: string;
+  chargeDate?: string;
+  billingSource: BillingSource;
+  paymentRail: ChargePaymentRail;
+  accountAlias?: string;
+  notes?: string;
+  matchedSubscriptionId?: string;
+}
+
 export interface SubscriptionDraft {
   serviceId: string;
   planId?: string;
@@ -104,6 +158,9 @@ export interface SubscriptionDraft {
   renewalDate: string;
   expectedNextCharge?: number;
   costChangeReason?: string;
+  intentTags?: SubscriptionIntentTag[];
+  renewalDecisionPlan?: RenewalDecisionPlan;
+  valueCheckIn?: ValueCheckIn;
   trialEndDate?: string;
   billingSource: BillingSource;
   billingIdentity?: string;
