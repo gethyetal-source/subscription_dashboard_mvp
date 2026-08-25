@@ -257,3 +257,5 @@
 - [x] Implement an approved weekly catalog-price refresh workflow with source and review safeguards
 - [x] Define the India/INR official-source price-report policy and structured change-record format
 - [x] Configure and validate the recurring weekly India catalog price-change research report
+- [x] Fix catalog-plan selection so a safe reference amount and currency are reflected in the subscription form
+- [x] Add regression coverage for plan selection, catalog price parsing, and preservation of user-entered amounts

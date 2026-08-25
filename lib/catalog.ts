@@ -1,4 +1,4 @@
-import type { BillingSource, CatalogPlan, ServiceDefinition } from "./subscription-types";
+import type { BillingCadence, BillingSource, CatalogPlan, ServiceDefinition } from "./subscription-types";
 
 const plans = (items: Array<Omit<CatalogPlan, "cadence"> & { cadence?: CatalogPlan["cadence"] }>) =>
   items.map((item) => ({ cadence: "monthly" as const, ...item }));
@@ -449,4 +449,35 @@ export function getCatalogPriceGuidance(priceLabel: string) {
   if (signal === "regional") return "Price and availability vary by country, taxes, platform, and eligibility. Confirm the official price before saving your amount.";
   if (signal === "variable") return "This label is not one fixed personal price. Confirm the provider’s current price, seat count, taxes, and billing cadence before saving your amount.";
   return "This is a catalog reference price, not live billing data. Confirm the provider’s current regional price, taxes, and billing source before saving your amount.";
+}
+
+export type CatalogPricePrefill = {
+  amount: number;
+  currency: string;
+  cadence: BillingCadence;
+};
+
+const catalogCurrencyPrefixes: Array<{ prefix: string; currency: string }> = [
+  { prefix: "US$", currency: "USD" },
+  { prefix: "$", currency: "USD" },
+  { prefix: "₹", currency: "INR" },
+  { prefix: "€", currency: "EUR" },
+  { prefix: "£", currency: "GBP" },
+];
+
+/** Returns a safe editable reference only for one fixed catalog price. */
+export function getCatalogPricePrefill(plan: CatalogPlan): CatalogPricePrefill | null {
+  if (getCatalogPriceSignal(plan.priceLabel) !== "reference") return null;
+
+  const currencyEntry = catalogCurrencyPrefixes.find(({ prefix }) => plan.priceLabel.startsWith(prefix));
+  if (!currencyEntry) return null;
+
+  const priceText = plan.priceLabel.slice(currencyEntry.prefix.length).trim();
+  const match = priceText.match(/^(\d+(?:\.\d+)?)\s*\/\s*(week|month|quarter|year)$/i);
+  if (!match) return null;
+
+  const amount = Number.parseFloat(match[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+
+  return { amount, currency: currencyEntry.currency, cadence: plan.cadence };
 }
