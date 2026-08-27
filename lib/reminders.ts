@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 
 import type { SubscriptionRecord } from "@/lib/subscription-types";
-import { daysUntil } from "@/lib/subscription-utils";
+import { daysUntil, getRenewalReminderCopy } from "@/lib/subscription-utils";
 import { getService } from "@/lib/catalog";
 import type { ReminderPermissionState } from "@/lib/reminder-utils";
 
@@ -71,7 +71,7 @@ export async function scheduleRenewalReminder(subscription: SubscriptionRecord, 
   return Notifications.scheduleNotificationAsync({
     content: {
       title: `${service?.name ?? "Subscription"} renews soon`,
-      body: `Your ${subscription.planName} plan renews on ${subscription.renewalDate}.`,
+      body: getRenewalReminderCopy(subscription),
       data: { subscriptionId: subscription.id, url: `/subscription/${subscription.id}` },
     },
     trigger: {

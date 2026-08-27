@@ -11,6 +11,7 @@ const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Popp
 const issueTone: Record<SubscriptionControlIssueKind, { glyph: string; color: string; background: string }> = {
   "cancellation-follow-up": { glyph: "!", color: "#FF9B8C", background: "#36221C" },
   "possible-duplicate": { glyph: "=", color: "#F4D56E", background: "#363019" },
+  "category-overlap": { glyph: "≈", color: "#F4D56E", background: "#363019" },
   "annual-renewal": { glyph: "$", color: "#F4D56E", background: "#363019" },
   "trial-deadline": { glyph: "!", color: "#F4D56E", background: "#363019" },
   "renewal-setting": { glyph: "↻", color: "#C9F72D", background: "#2A3511" },

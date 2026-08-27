@@ -119,6 +119,10 @@ export default function RootLayout() {
                 <Stack.Screen name="control-center" />
                 <Stack.Screen name="decision-plan" />
                 <Stack.Screen name="charge-recognition" />
+                <Stack.Screen name="catalog-updates" />
+                <Stack.Screen name="catalog-correction" />
+                <Stack.Screen name="evidence-index" />
+                <Stack.Screen name="archive-insights" />
                 <Stack.Screen name="cloud-sync" />
                 <Stack.Screen name="password-reset" />
                 <Stack.Screen name="oauth/callback" />

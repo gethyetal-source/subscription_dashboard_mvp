@@ -259,3 +259,16 @@
 - [x] Configure and validate the recurring weekly India catalog price-change research report
 - [x] Fix catalog-plan selection so a safe reference amount and currency are reflected in the subscription form
 - [x] Add regression coverage for plan selection, catalog price parsing, and preservation of user-entered amounts
+- [x] Audit the subscription-entry screen for user-facing UI and interaction defects
+- [x] Report the recent commit history for the plan-selection repair
+- [x] Add a local plan-change timeline for plan, price, and billing-cadence changes
+- [x] Add renewal decision reminders using saved value-check and decision-plan context
+- [x] Add category-aware duplicate-plan overlap suggestions
+- [x] Add trial-to-paid countdown with expected paid-charge context and official handoff
+- [x] Add a clearer subscription ownership and sharing view
+- [x] Add a local price-reference update inbox from weekly India report findings
+- [x] Add a local receipt-and-evidence index without uploading or reading invoices
+- [x] Improve renewal calendar export details with expected amount and user notes
+- [x] Add archived-subscription savings and history insights
+- [x] Add a local catalog correction request form with official-source evidence fields
+- [x] Add deterministic coverage and validate the requested feature set

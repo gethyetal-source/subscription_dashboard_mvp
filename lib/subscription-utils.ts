@@ -1,5 +1,5 @@
 import { billingSourceMeta, getService } from "./catalog";
-import type { BillingCadence, BillingSource, ChargeRecognitionDraft, HouseholdMember, RenewalDecisionAction, ServiceCategory, SubscriptionRecord } from "./subscription-types";
+import type { BillingCadence, BillingSource, ChargeRecognitionCase, ChargeRecognitionDraft, HouseholdMember, RenewalDecisionAction, ServiceCategory, SubscriptionRecord } from "./subscription-types";
 
 const cadenceMonths: Record<BillingCadence, number> = { weekly: 0.23, monthly: 1, quarterly: 3, yearly: 12 };
 
@@ -194,7 +194,7 @@ export function getChargeRecognitionSupportCopy(source: BillingSource) {
   return "Start with your own receipt, statement label, wallet activity, and account email. If the charge remains unknown, use the official support or unauthorized-charge route for the billing source you identify.";
 }
 
-export type SubscriptionControlIssueKind = "cancellation-follow-up" | "possible-duplicate" | "annual-renewal" | "trial-deadline" | "renewal-setting" | "billing-identity" | "billing-source" | "uncertain-status";
+export type SubscriptionControlIssueKind = "cancellation-follow-up" | "possible-duplicate" | "category-overlap" | "annual-renewal" | "trial-deadline" | "renewal-setting" | "billing-identity" | "billing-source" | "uncertain-status";
 
 export interface SubscriptionControlIssue {
   id: string;
@@ -252,7 +252,7 @@ export function getSubscriptionControlIssues(subscriptions: SubscriptionRecord[]
       issues.push({ id: `identity-${subscription.id}`, kind: "billing-identity", priority: 65, title: `Add a billing label for ${serviceName}`, body: "Save the exact local merchant label, account alias, or receipt clue that helps you recognize the charge later.", subscriptionIds: [subscription.id] });
     }
     if (subscription.status === "trial" && renewalDays >= 0 && renewalDays <= 7) {
-      issues.push({ id: `trial-${subscription.id}`, kind: "trial-deadline", priority: 80, title: `${serviceName} trial ends soon`, body: `Decide before ${formatDate(subscription.trialEndDate ?? subscription.renewalDate)} so a short trial does not become an unplanned paid renewal.`, subscriptionIds: [subscription.id] });
+      issues.push({ id: `trial-${subscription.id}`, kind: "trial-deadline", priority: 80, title: `${serviceName} trial ends soon`, body: `Decide before ${formatDate(subscription.trialEndDate ?? subscription.renewalDate)}. Your local expected next charge is ${formatCurrency(subscription.expectedNextCharge ?? subscription.amount, subscription.currency)}; confirm actual billing with the provider.`, subscriptionIds: [subscription.id] });
     }
     if (subscription.cadence === "yearly" && renewalDays >= 0 && renewalDays <= 45) {
       issues.push({ id: `annual-${subscription.id}`, kind: "annual-renewal", priority: 75, title: `Review ${serviceName}'s annual renewal`, body: `${formatCurrency(subscription.amount, subscription.currency)} is scheduled for ${formatDate(subscription.renewalDate)}. Confirm the plan and auto-renew setting while there is time to act.`, subscriptionIds: [subscription.id] });
@@ -264,6 +264,11 @@ export function getSubscriptionControlIssues(subscriptions: SubscriptionRecord[]
   getPotentialDuplicateGroups(active).forEach((group) => {
     const serviceName = getService(group.subscriptions[0]?.serviceId ?? "")?.name ?? group.subscriptions[0]?.planName ?? "A subscription";
     issues.push({ id: `duplicate-${group.key}`, kind: "possible-duplicate", priority: 90, title: `Review possible duplicate: ${serviceName}`, body: `${group.subscriptions.length} active local records have the same service and plan. Compare billing sources and dates before deleting or cancelling anything.`, subscriptionIds: group.subscriptions.map((item) => item.id) });
+  });
+  getCategoryOverlapSuggestions(active).forEach((group) => {
+    const names = group.subscriptions.map((item) => getService(item.serviceId)?.name ?? item.planName).slice(0, 3).join(", ");
+    const currencyContext = group.monthlyByCurrency.map((item) => `${formatCurrency(item.monthly, item.currency)}/month`).join(" · ");
+    issues.push({ id: `category-${group.category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, kind: "category-overlap", priority: 45, title: `Compare ${group.category} subscriptions`, body: `${group.subscriptions.length} active services (${names}) may overlap in purpose. Review them at your own pace; current local estimates: ${currencyContext}.`, subscriptionIds: group.subscriptions.map((item) => item.id) });
   });
   return issues.sort((a, b) => b.priority - a.priority || a.title.localeCompare(b.title));
 }
@@ -379,6 +384,136 @@ export function getCategorySpendTrend(subscriptions: SubscriptionRecord[], refer
     category: category as ServiceCategory | "Other",
     points: getMonthlySpendTrend(subscriptions.filter((item) => (getService(item.serviceId)?.category ?? "Other") === category), reference, months),
   }));
+}
+
+export interface TrialToPaidCountdown {
+  subscription: SubscriptionRecord;
+  dueDate: string;
+  dueInDays: number;
+  expectedCharge: number;
+}
+
+/** Surfaces only upcoming local trial conversions; it never verifies a provider charge. */
+export function getTrialToPaidCountdowns(subscriptions: SubscriptionRecord[], reference = new Date()): TrialToPaidCountdown[] {
+  return subscriptions
+    .filter((item) => item.status === "trial")
+    .map((subscription) => {
+      const dueDate = subscription.trialEndDate ?? subscription.renewalDate;
+      return { subscription, dueDate, dueInDays: daysUntil(dueDate, reference), expectedCharge: subscription.expectedNextCharge ?? subscription.amount };
+    })
+    .filter((item) => item.dueInDays >= 0 && item.dueInDays <= 30)
+    .sort((left, right) => left.dueInDays - right.dueInDays);
+}
+
+/** Creates concise local reminder copy using only fields already saved by the user. */
+export function getRenewalReminderCopy(subscription: SubscriptionRecord) {
+  const serviceName = getService(subscription.serviceId)?.name ?? subscription.planName;
+  const decision = subscription.renewalDecisionPlan?.action;
+  const charge = formatCurrency(subscription.expectedNextCharge ?? subscription.amount, subscription.currency);
+  if (subscription.status === "trial") return `${serviceName} may move to ${charge} after the trial. Review your saved decision before ${subscription.trialEndDate ?? subscription.renewalDate}.`;
+  if (decision) return `${serviceName}: your local decision is “${decision.replace("-", " ")}.” Review the ${charge} renewal before ${subscription.renewalDate}.`;
+  if (subscription.valueCheckIn?.wouldBuyAgain === "no" || subscription.valueCheckIn?.useLevel === "rare") return `${serviceName} renews for ${charge}. Your last value check-in suggests reviewing it before ${subscription.renewalDate}.`;
+  return `Your ${subscription.planName} plan renews for ${charge} on ${subscription.renewalDate}.`;
+}
+
+export function getPlanChangeHistory(subscription: SubscriptionRecord) {
+  return [...(subscription.planChangeHistory ?? [])].sort((left, right) => new Date(right.changedAt).getTime() - new Date(left.changedAt).getTime());
+}
+
+export interface SubscriptionOwnershipShare {
+  member: HouseholdMember;
+  percentage: number;
+  monthly: number;
+  annual: number;
+}
+
+export function getSubscriptionOwnership(subscription: SubscriptionRecord, members: HouseholdMember[]): SubscriptionOwnershipShare[] {
+  const assigned = Array.from(new Set(["owner", ...(subscription.sharedMemberIds ?? [])]));
+  const people = members.filter((member) => assigned.includes(member.id));
+  const allocation = getHouseholdAllocation(people.map((member) => member.id), subscription.sharedMemberShares);
+  return people.map((member) => ({
+    member,
+    percentage: allocation[member.id] ?? 0,
+    monthly: Number((monthlyAmount(subscription.amount, subscription.cadence) * ((allocation[member.id] ?? 0) / 100)).toFixed(2)),
+    annual: Number((annualAmount(subscription.amount, subscription.cadence) * ((allocation[member.id] ?? 0) / 100)).toFixed(2)),
+  }));
+}
+
+export interface CategoryOverlapSuggestion {
+  category: ServiceCategory | "Other";
+  subscriptions: SubscriptionRecord[];
+  monthlyByCurrency: CurrencySpendGroup[];
+}
+
+/** Identifies different active services in one category as a review prompt, not a recommendation to cancel. */
+export function getCategoryOverlapSuggestions(subscriptions: SubscriptionRecord[]): CategoryOverlapSuggestion[] {
+  const groups = new Map<ServiceCategory | "Other", SubscriptionRecord[]>();
+  subscriptions.filter((item) => item.status !== "cancelled").forEach((subscription) => {
+    const category = getService(subscription.serviceId)?.category ?? "Other";
+    groups.set(category, [...(groups.get(category) ?? []), subscription]);
+  });
+  return Array.from(groups.entries())
+    .filter(([, items]) => new Set(items.map((item) => item.serviceId)).size > 1)
+    .map(([category, items]) => ({ category, subscriptions: items, monthlyByCurrency: getCurrencySpendGroups(items) }))
+    .sort((left, right) => right.subscriptions.length - left.subscriptions.length || left.category.localeCompare(right.category));
+}
+
+export interface ArchivedSubscriptionInsights {
+  archivedCount: number;
+  monthlySavingsByCurrency: CurrencySpendGroup[];
+  annualSavingsByCurrency: CurrencySpendGroup[];
+  mostRecentArchive?: SubscriptionRecord;
+}
+
+export function getArchivedSubscriptionInsights(subscriptions: SubscriptionRecord[]): ArchivedSubscriptionInsights {
+  const archived = subscriptions.filter((item) => item.status === "cancelled");
+  const totals = new Map<string, { monthly: number; annual: number; count: number }>();
+  archived.forEach((item) => {
+    const currency = item.currency.toUpperCase();
+    const current = totals.get(currency) ?? { monthly: 0, annual: 0, count: 0 };
+    current.monthly += monthlyAmount(item.amount, item.cadence);
+    current.annual += annualAmount(item.amount, item.cadence);
+    current.count += 1;
+    totals.set(currency, current);
+  });
+  const groups = Array.from(totals.entries()).map(([currency, value]) => ({ currency, monthly: Number(value.monthly.toFixed(2)), annual: Number(value.annual.toFixed(2)), subscriptionCount: value.count })).sort((left, right) => left.currency.localeCompare(right.currency));
+  return { archivedCount: archived.length, monthlySavingsByCurrency: groups, annualSavingsByCurrency: groups, mostRecentArchive: [...archived].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0] };
+}
+
+export type EvidenceIndexKind = "billing-clue" | "cancellation-reference" | "price-context" | "plan-change" | "charge-worksheet";
+export interface EvidenceIndexItem { id: string; kind: EvidenceIndexKind; title: string; detail: string; date: string; subscriptionId?: string; }
+
+/** Creates a local index of labels and references already entered by the user; it never reads receipts or email. */
+export function getLocalEvidenceIndex(subscriptions: SubscriptionRecord[], chargeRecognitionCases: ChargeRecognitionCase[]): EvidenceIndexItem[] {
+  const entries: EvidenceIndexItem[] = [];
+  subscriptions.forEach((subscription) => {
+    const serviceName = getService(subscription.serviceId)?.name ?? subscription.planName;
+    if (subscription.billingIdentity) entries.push({ id: `billing-${subscription.id}`, kind: "billing-clue", title: `${serviceName} billing clue`, detail: subscription.billingIdentity, date: subscription.updatedAt, subscriptionId: subscription.id });
+    if (subscription.cancellationConfirmationReference) entries.push({ id: `cancel-${subscription.id}`, kind: "cancellation-reference", title: `${serviceName} cancellation reference`, detail: subscription.cancellationConfirmationReference, date: subscription.cancellationConfirmedAt ?? subscription.updatedAt, subscriptionId: subscription.id });
+    if (subscription.costChangeReason) entries.push({ id: `price-${subscription.id}`, kind: "price-context", title: `${serviceName} price context`, detail: subscription.costChangeReason, date: subscription.updatedAt, subscriptionId: subscription.id });
+    getPlanChangeHistory(subscription).forEach((event) => entries.push({ id: event.id, kind: "plan-change", title: `${serviceName} plan change`, detail: `${event.previousPlanName} → ${event.nextPlanName}`, date: event.changedAt, subscriptionId: subscription.id }));
+  });
+  chargeRecognitionCases.forEach((item) => entries.push({ id: `charge-${item.id}`, kind: "charge-worksheet", title: "Charge-recognition worksheet", detail: item.merchantLabel, date: item.updatedAt, subscriptionId: item.matchedSubscriptionId }));
+  return entries.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+}
+
+function escapeIcs(value: string) { return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;"); }
+
+/** Creates a shareable iCalendar payload that contains only user-saved renewal context. */
+export function buildRenewalCalendarExport(subscriptions: SubscriptionRecord[], generatedAt = new Date()) {
+  const stamp = generatedAt.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const events = subscriptions
+    .filter((item) => item.status !== "cancelled")
+    .sort((left, right) => left.renewalDate.localeCompare(right.renewalDate))
+    .map((item) => {
+      const end = new Date(`${item.renewalDate}T00:00:00`);
+      end.setDate(end.getDate() + 1);
+      const serviceName = getService(item.serviceId)?.name ?? item.planName;
+      const expected = formatCurrency(item.expectedNextCharge ?? item.amount, item.currency);
+      const description = [`Plan: ${item.planName}`, `Expected local charge: ${expected}`, `Billing cadence: ${item.cadence}`, `Billing source: ${item.billingSource}`, item.notes ? `Local note: ${item.notes}` : undefined, "Review the official provider management page before this renewal."].filter(Boolean).join("\n");
+      return ["BEGIN:VEVENT", `UID:subtrack-${escapeIcs(item.id)}@local`, `DTSTAMP:${stamp}Z`, `DTSTART;VALUE=DATE:${item.renewalDate.replace(/-/g, "")}`, `DTEND;VALUE=DATE:${end.toISOString().slice(0, 10).replace(/-/g, "")}`, `SUMMARY:${escapeIcs(`SubTrack renewal — ${serviceName}`)}`, `DESCRIPTION:${escapeIcs(description)}`, "END:VEVENT"].join("\r\n");
+    }).join("\r\n");
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SubTrack//Renewals//EN", "CALSCALE:GREGORIAN", events, "END:VCALENDAR", ""].join("\r\n");
 }
 
 export function resolveManagementUrl(subscription: SubscriptionRecord) { const billingMeta = billingSourceMeta[subscription.billingSource]; return billingMeta.url ?? getService(subscription.serviceId)?.managementUrl ?? getService(subscription.serviceId)?.officialUrl ?? "https://www.google.com/"; }

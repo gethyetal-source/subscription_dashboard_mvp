@@ -34,6 +34,43 @@ export interface ValueCheckIn {
   checkedAt: string;
 }
 
+/** A local audit entry created when a saved plan, amount, currency, or cadence changes. */
+export interface PlanChangeEvent {
+  id: string;
+  changedAt: string;
+  previousPlanName: string;
+  nextPlanName: string;
+  previousAmount: number;
+  nextAmount: number;
+  previousCurrency: string;
+  nextCurrency: string;
+  previousCadence: BillingCadence;
+  nextCadence: BillingCadence;
+}
+
+/** A local catalog correction proposal. It is never sent automatically or used as price evidence. */
+export interface CatalogCorrectionRequest {
+  id: string;
+  serviceId?: string;
+  serviceName: string;
+  country: string;
+  planName?: string;
+  observedPrice?: string;
+  sourceUrl?: string;
+  note?: string;
+  createdAt: string;
+}
+
+export interface CatalogCorrectionDraft {
+  serviceId?: string;
+  serviceName: string;
+  country: string;
+  planName?: string;
+  observedPrice?: string;
+  sourceUrl?: string;
+  note?: string;
+}
+
 export interface HouseholdMember {
   id: string;
   name: string;
@@ -83,6 +120,8 @@ export interface SubscriptionRecord {
   renewalDecisionPlan?: RenewalDecisionPlan;
   /** User-entered worth check-in; this never tracks app usage or account activity. */
   valueCheckIn?: ValueCheckIn;
+  /** Local audit trail of changed plan and price fields. */
+  planChangeHistory?: PlanChangeEvent[];
   trialEndDate?: string;
   billingSource: BillingSource;
   /** A local label copied from a receipt, statement, wallet, or provider account. */
@@ -161,6 +200,7 @@ export interface SubscriptionDraft {
   intentTags?: SubscriptionIntentTag[];
   renewalDecisionPlan?: RenewalDecisionPlan;
   valueCheckIn?: ValueCheckIn;
+  planChangeHistory?: PlanChangeEvent[];
   trialEndDate?: string;
   billingSource: BillingSource;
   billingIdentity?: string;
