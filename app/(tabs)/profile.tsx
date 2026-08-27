@@ -101,8 +101,10 @@ export default function ProfileScreen() {
       <Pressable onPress={() => router.push("/password-reset" as never)} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}><Text style={styles.secondaryButtonText}>Change password</Text></Pressable>
       <Text style={styles.detailTitle}>Backup</Text><Text style={styles.detailBody}>Manual sync and restore choices are available from Cloud sync.</Text>
       <Pressable onPress={() => router.push("/cloud-sync" as never)} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}><Text style={styles.secondaryButtonText}>Manage cloud sync</Text></Pressable>
+      <Text style={styles.detailTitle}>Account deletion</Text><Text style={styles.detailBody}>Permanently remove this optional cloud account and its remote backup. Local records on this device remain under your control.</Text>
+      <Pressable onPress={() => router.push("/delete-account" as never)} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}><Text style={styles.secondaryButtonText}>Delete cloud account</Text></Pressable>
     </View>
-    <Pressable onPress={confirmSignOut} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}><Text style={styles.signOutText}>Sign out of cloud sync</Text></Pressable>
+    <Pressable onPress={() => router.push("/privacy-policy" as never)} style={({ pressed }) => [styles.privacyLink, pressed && styles.pressed]}><Text style={styles.privacyLinkText}>Privacy policy</Text></Pressable><Pressable onPress={confirmSignOut} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}><Text style={styles.signOutText}>Sign out of cloud sync</Text></Pressable>
   </ScrollView></ScreenContainer>;
 }
 
@@ -138,6 +140,8 @@ function makeStyles(isDark: boolean) {
     secondaryButtonText: { color: palette.text, fontFamily: type.semi, fontSize: 12 },
     signOutButton: { alignItems: "center", justifyContent: "center", marginTop: 22, minHeight: 40 },
     signOutText: { color: palette.danger, fontFamily: type.semi, fontSize: 12 },
+    privacyLink: { alignItems: "center", justifyContent: "center", marginTop: 20, minHeight: 32 },
+    privacyLinkText: { color: palette.accent, fontFamily: type.semi, fontSize: 11 },
     loadingText: { color: palette.muted, fontFamily: type.regular, fontSize: 12, marginTop: 10 },
     loader: { color: palette.accent },
     placeholder: { color: palette.placeholder },

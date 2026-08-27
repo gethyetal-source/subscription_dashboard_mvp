@@ -272,3 +272,9 @@
 - [x] Add archived-subscription savings and history insights
 - [x] Add a local catalog correction request form with official-source evidence fields
 - [x] Add deterministic coverage and validate the requested feature set
+- [x] Audit Play Store launch readiness against current app behavior and Android release requirements
+- [x] Add in-app cloud-account deletion that removes the associated remote backup data
+- [x] Add an in-app privacy policy and a public privacy-policy route for Play Store linking
+- [x] Remove unused audio and microphone configuration and prepare Android release configuration
+- [x] Add release material and Play Console handoff guidance for the SubTrack launch
+- [x] Add regression coverage and validate the Play Store preparation milestone

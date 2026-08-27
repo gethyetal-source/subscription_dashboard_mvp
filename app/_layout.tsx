@@ -123,6 +123,8 @@ export default function RootLayout() {
                 <Stack.Screen name="catalog-correction" />
                 <Stack.Screen name="evidence-index" />
                 <Stack.Screen name="archive-insights" />
+                <Stack.Screen name="privacy-policy" />
+                <Stack.Screen name="delete-account" />
                 <Stack.Screen name="cloud-sync" />
                 <Stack.Screen name="password-reset" />
                 <Stack.Screen name="oauth/callback" />

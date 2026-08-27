@@ -2,7 +2,8 @@
 import "./scripts/load-env.js";
 import type { ExpoConfig } from "expo/config";
 
-// Bundle ID format: space.manus.<project_name_dots>.<timestamp>
+// Confirm and replace this provisional package ID before the first Play upload.
+// A published Google Play package ID cannot be changed later.
 // e.g., "my-app" created at 2024-01-15 10:30:45 -> "space.manus.my.app.t20240115103045"
 // Bundle ID can only contain letters, numbers, and dots
 // Android requires each dot-separated segment to start with a letter
@@ -64,11 +65,12 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
+    versionCode: 1,
     permissions: ["POST_NOTIFICATIONS"],
     intentFilters: [
       {
         action: "VIEW",
-        autoVerify: true,
+        autoVerify: false,
         data: [
           {
             scheme: env.scheme,
@@ -101,19 +103,6 @@ const config: ExpoConfig = {
       "expo-notifications",
       {
         "defaultChannel": "renewals",
-      },
-    ],
-    [
-      "expo-audio",
-      {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
-      },
-    ],
-    [
-      "expo-video",
-      {
-        supportsBackgroundPlayback: true,
-        supportsPictureInPicture: true,
       },
     ],
     [

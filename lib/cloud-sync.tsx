@@ -44,6 +44,7 @@ interface CloudSyncValue {
   updateEmail: (email: string) => Promise<void>;
   resendEmailChange: () => Promise<void>;
   signOut: () => Promise<void>;
+  deleteCloudAccount: () => Promise<void>;
   syncNow: () => Promise<void>;
   getRestorePreview: () => Promise<CloudRestorePreview | null>;
   restoreFromCloud: () => Promise<boolean>;
@@ -232,6 +233,18 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
     await AsyncStorage.removeItem(LAST_SYNC_KEY);
   }, []);
 
+  const deleteCloudAccount = useCallback(async () => {
+    if (!supabase || !session?.user.id) throw new Error("Sign in before deleting your cloud account.");
+    const { data, error } = await supabase.functions.invoke("delete-subtrack-account", { method: "POST" });
+    if (error || !data?.deleted) throw new Error("We could not delete your cloud account. Your local records were not removed.");
+    await supabase.auth.signOut().catch(() => undefined);
+    setSession(null);
+    setLastSyncAt(undefined);
+    setPendingEmailChange(undefined);
+    await AsyncStorage.removeItem(LAST_SYNC_KEY);
+    await clearVerificationPending();
+  }, [clearVerificationPending, session?.user.id]);
+
   const syncNow = useCallback(async () => {
     if (!supabase || !session?.user.id) throw new Error("Sign in before syncing your data.");
     const snapshot = prepareCloudSnapshot({ subscriptions, settings, householdMembers });
@@ -298,10 +311,11 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
     updateEmail,
     resendEmailChange,
     signOut,
+    deleteCloudAccount,
     syncNow,
     getRestorePreview,
     restoreFromCloud,
-  }), [authCallbackMessage, clearAuthCallbackMessage, clearVerificationPending, getRestorePreview, isLoading, lastSyncAt, pendingEmailChange, requestPasswordReset, resendEmailChange, resendVerification, restoreFromCloud, session?.user.email, session?.user.user_metadata?.full_name, signIn, signOut, signUp, syncNow, updateEmail, updatePassword, updateProfile, verificationPendingEmail]);
+  }), [authCallbackMessage, clearAuthCallbackMessage, clearVerificationPending, deleteCloudAccount, getRestorePreview, isLoading, lastSyncAt, pendingEmailChange, requestPasswordReset, resendEmailChange, resendVerification, restoreFromCloud, session?.user.email, session?.user.user_metadata?.full_name, signIn, signOut, signUp, syncNow, updateEmail, updatePassword, updateProfile, verificationPendingEmail]);
 
   return <CloudSyncContext.Provider value={value}>{children}</CloudSyncContext.Provider>;
 }
