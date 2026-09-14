@@ -278,3 +278,9 @@
 - [x] Remove unused audio and microphone configuration and prepare Android release configuration
 - [x] Add release material and Play Console handoff guidance for the SubTrack launch
 - [x] Add regression coverage and validate the Play Store preparation milestone
+
+- [ ] Audit and update dependency packages to current Expo-compatible versions, regenerate lockfiles, and validate TypeScript, tests, lint, and web build.
+- [ ] Preserve application behavior and document any packages intentionally held back for Expo/React Native compatibility.
+- [ ] Save a checkpoint for the validated dependency upgrade.
+
+- [x] Create a fresh dated India/INR catalog price-change report for every current catalog service using directly opened provider-owned public sources, without modifying app or user data.
