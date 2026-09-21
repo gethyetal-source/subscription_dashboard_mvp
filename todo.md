@@ -284,3 +284,5 @@
 - [ ] Save a checkpoint for the validated dependency upgrade.
 
 - [x] Create a fresh dated India/INR catalog price-change report for every current catalog service using directly opened provider-owned public sources, without modifying app or user data.
+
+- [x] Create a fresh dated India/INR catalog price-change report for every current catalog service using directly opened provider-owned public sources, without modifying app or user data.
