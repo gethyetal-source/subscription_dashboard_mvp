@@ -6,6 +6,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { normalizeCloudEmail } from "@/lib/cloud-sync-auth-utils";
 import { useCloudSync } from "@/lib/cloud-sync";
 import { useThemeContext } from "@/lib/theme-provider";
+import { useThemedStyles } from "@/lib/ui-theme";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
@@ -16,7 +17,7 @@ function initials(name?: string, email?: string) {
 
 export default function ProfileScreen() {
   const { colorScheme } = useThemeContext();
-  const styles = useMemo(() => makeStyles(colorScheme === "dark"), [colorScheme]);
+  const styles = useThemedStyles(useMemo(() => makeStyles(colorScheme === "dark"), [colorScheme]));
   const { isConfigured, isLoading, userEmail, profileName, needsProfileSetup, pendingEmailChange, updateProfile, updateEmail, resendEmailChange, signOut } = useCloudSync();
   const [name, setName] = useState(profileName ?? "");
   const [emailInput, setEmailInput] = useState(userEmail ?? "");

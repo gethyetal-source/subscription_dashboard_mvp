@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useMemo, useState } from "react";
 
@@ -10,10 +11,12 @@ import { useSubscriptions } from "@/lib/subscription-store";
 import type { SubscriptionDraft, SubscriptionRecord, SubscriptionStatus } from "@/lib/subscription-types";
 import { isFutureDate, nextLocalDateKey } from "@/lib/subscription-utils";
 
-const filters: Array<{ label: string; value: "all" | SubscriptionStatus }> = [{ label: "All", value: "all" }, { label: "Active", value: "active" }, { label: "Trials", value: "trial" }, { label: "Cancelled", value: "cancelled" }];
+const filters: { label: string; value: "all" | SubscriptionStatus }[] = [{ label: "All", value: "all" }, { label: "Active", value: "active" }, { label: "Trials", value: "trial" }, { label: "Pending / uncertain", value: "uncertain" }, { label: "Cancelled / archived", value: "cancelled" }];
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
+const baseStyles = () => ({ styles, electric, revamp });
 export default function SubscriptionsScreen() {
+  const { styles, electric, revamp } = useThemedStyles(baseStyles());
   const { subscriptions, updateSubscription, deleteSubscription } = useSubscriptions();
   const [filter, setFilter] = useState<"all" | SubscriptionStatus>("all");
   const [quickEditRecord, setQuickEditRecord] = useState<SubscriptionRecord | null>(null);
@@ -24,6 +27,7 @@ export default function SubscriptionsScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState<SubscriptionRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const filtered = useMemo(() => filter === "all" ? subscriptions : subscriptions.filter((item) => item.status === filter), [filter, subscriptions]);
 
   const openQuickEdit = (record: SubscriptionRecord) => {
@@ -57,6 +61,8 @@ export default function SubscriptionsScreen() {
     try {
       await updateSubscription(id, { ...draft, amount, renewalDate } satisfies SubscriptionDraft);
       setQuickEditRecord(null);
+    } catch (error) {
+      setAmountError(error instanceof Error ? error.message : "Could not save.");
     } finally {
       setIsSaving(false);
     }
@@ -66,9 +72,12 @@ export default function SubscriptionsScreen() {
     if (!deleteCandidate || isDeleting) return;
     const record = deleteCandidate;
     setDeleteCandidate(null);
+    setDeleteError("");
     setIsDeleting(true);
     try {
       await deleteSubscription(record.id);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "The record was not deleted. Please try again.");
     } finally {
       setIsDeleting(false);
     }
@@ -80,7 +89,7 @@ export default function SubscriptionsScreen() {
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      ListHeaderComponent={<><ElectricPageHeader title="Subscriptions" subtitle="Everything you track, in one place." trailing={<Pressable accessibilityRole="button" accessibilityLabel="Add subscription" onPress={() => router.push("/(tabs)/discover")} style={({ pressed }) => [electric.addButton, pressed && styles.pressed]}><Text style={electric.addText}>Add</Text></Pressable>} /><View style={[styles.filters, revamp.filters]}>{filters.map((item) => <Pressable key={item.value} onPress={() => setFilter(item.value)} style={({ pressed }) => [styles.filter, filter === item.value && styles.filterSelected, filter === item.value && revamp.filterSelected, pressed && styles.pressed]}><Text style={[styles.filterText, filter === item.value && styles.filterTextSelected, filter === item.value && revamp.filterTextSelected]}>{item.label}</Text></Pressable>)}</View></>}
+      ListHeaderComponent={<><ElectricPageHeader title="Subscriptions" subtitle="Everything you track, in one place." trailing={<Pressable accessibilityRole="button" accessibilityLabel="Add subscription" onPress={() => router.push("/(tabs)/discover")} style={({ pressed }) => [electric.addButton, pressed && styles.pressed]}><Text style={electric.addText}>Add</Text></Pressable>} /><View style={[styles.filters, revamp.filters]}>{filters.map((item) => <Pressable key={item.value} onPress={() => setFilter(item.value)} style={({ pressed }) => [styles.filter, filter === item.value && styles.filterSelected, filter === item.value && revamp.filterSelected, pressed && styles.pressed]}><Text style={[styles.filterText, filter === item.value && styles.filterTextSelected, filter === item.value && revamp.filterTextSelected]}>{item.label}</Text></Pressable>)}</View>{deleteError ? <Text accessibilityRole="alert" style={styles.errorText}>{deleteError}</Text> : null}</>}
       ListEmptyComponent={<EmptyState title="No subscriptions here" body="Explore the catalog to add a plan, price, renewal date, and billing source." />}
       renderItem={({ item }) => <SubscriptionRow item={item} onPress={() => router.push(`/subscription/${item.id}` as never)} onQuickEdit={() => openQuickEdit(item)} onDelete={() => setDeleteCandidate(item)} />}
       ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -148,7 +157,7 @@ const styles = StyleSheet.create({
   deleteTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 17 },
   deleteBody: { color: "#A8AD98", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 8 },
   deleteButton: { alignItems: "center", backgroundColor: "#C5221F", borderRadius: 22, justifyContent: "center", minHeight: 44, paddingHorizontal: 17 },
-  deleteButtonText: { color: "#FFFFFF", fontFamily: type.semi, fontSize: 12 },
+  deleteButtonText: { color: "white", fontFamily: type.semi, fontSize: 12 },
   disabled: { opacity: 0.56 },
   pressed: { opacity: 0.75 },
 });

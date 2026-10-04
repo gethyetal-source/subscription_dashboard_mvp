@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -7,7 +8,9 @@ import { useCloudSync } from "@/lib/cloud-sync";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
+const baseStyles = () => styles;
 export default function PasswordResetScreen() {
+  const styles = useThemedStyles(baseStyles());
   const { updatePassword } = useCloudSync();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

@@ -1,404 +1,211 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 
-import { cancelRenewalReminder, scheduleRenewalReminder } from "@/lib/reminders";
-import type { AppSettings, CatalogCorrectionDraft, CatalogCorrectionRequest, ChargeRecognitionCase, ChargeRecognitionDraft, HouseholdMember, PlanChangeEvent, SubscriptionDraft, SubscriptionRecord } from "@/lib/subscription-types";
-import { nextLocalDateKey } from "@/lib/subscription-utils";
-
-const STORAGE_KEY = "subtrack.mvp.local-state.v1";
-
-interface StoredState {
-  subscriptions: SubscriptionRecord[];
-  settings: AppSettings;
-  householdMembers?: HouseholdMember[];
-  chargeRecognitionCases?: ChargeRecognitionCase[];
-  catalogCorrectionRequests?: CatalogCorrectionRequest[];
-}
+import { portableSnapshot, snapshotSchema, type ValidatedSnapshot } from "@/lib/data-safety";
+import { LocalStateRepository, emptySnapshot, type LocalBackup } from "@/lib/local-state-repository";
+import { cancelSubscriptionReminders, scheduleSubscriptionReminders } from "@/lib/reminders";
+import type { AppSettings, CatalogCorrectionDraft, CatalogCorrectionRequest, ChargeRecognitionCase, ChargeRecognitionDraft, HouseholdMember, PlanChangeEvent, SavingsEntry, SubscriptionDraft, SubscriptionRecord } from "@/lib/subscription-types";
+import { localDateKey } from "@/lib/subscription-utils";
+import { BACKUP_KEY } from "@/lib/data-safety";
 
 export interface LocalSubscriptionSnapshot {
   subscriptions: SubscriptionRecord[];
   settings: AppSettings;
   householdMembers: HouseholdMember[];
+  chargeRecognitionCases?: ChargeRecognitionCase[];
+  catalogCorrectionRequests?: CatalogCorrectionRequest[];
+  savingsEntries?: SavingsEntry[];
 }
-
-const defaultSettings: AppSettings = {
-  reminderDays: 3,
-  notificationsEnabled: true,
-  dashboardSort: "upcoming",
-  monthlyBudget: 0,
-};
-
-const ownerMember: HouseholdMember = {
-  id: "owner",
-  name: "You",
-  color: "#1A73E8",
-  isOwner: true,
-  createdAt: "2026-01-01T00:00:00.000Z",
-};
-
-const memberColors = ["#1A73E8", "#188038", "#A142F4", "#F29900", "#C5221F", "#00838F"];
-
-function normalizeHouseholdMembers(members?: HouseholdMember[]) {
-  return [ownerMember, ...(members ?? []).filter((member) => member.id !== ownerMember.id && member.name.trim())];
-}
-
-function normalizeSharedMemberIds(memberIds: string[] | undefined, members: HouseholdMember[]) {
-  const available = new Set(members.map((member) => member.id));
-  const normalized = Array.from(new Set([ownerMember.id, ...(memberIds ?? [])])).filter((id) => available.has(id));
-  return normalized.length ? normalized : [ownerMember.id];
-}
-
-interface SubscriptionStoreValue {
+interface SubscriptionStoreValue extends LocalSubscriptionSnapshot {
   isReady: boolean;
-  subscriptions: SubscriptionRecord[];
-  settings: AppSettings;
-  householdMembers: HouseholdMember[];
+  storageError?: string;
   chargeRecognitionCases: ChargeRecognitionCase[];
   catalogCorrectionRequests: CatalogCorrectionRequest[];
-  addSubscription: (draft: SubscriptionDraft) => Promise<SubscriptionRecord>;
-  updateSubscription: (id: string, draft: SubscriptionDraft) => Promise<SubscriptionRecord | undefined>;
-  updateDecisionSupport: (id: string, patch: Pick<SubscriptionRecord, "intentTags" | "renewalDecisionPlan" | "valueCheckIn">) => Promise<void>;
-  updateStatus: (id: string, status: SubscriptionRecord["status"]) => Promise<void>;
-  beginCancellationFollowUp: (id: string) => Promise<void>;
-  confirmCancellation: (id: string) => Promise<void>;
-  deleteSubscription: (id: string) => Promise<void>;
-  restoreSubscription: (record: SubscriptionRecord) => Promise<void>;
-  updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
-  addHouseholdMember: (name: string) => Promise<HouseholdMember | undefined>;
-  removeHouseholdMember: (id: string) => Promise<void>;
-  replaceLocalSnapshot: (snapshot: LocalSubscriptionSnapshot) => Promise<void>;
-  resetLocalData: () => Promise<void>;
-  saveChargeRecognitionCase: (draft: ChargeRecognitionDraft) => Promise<ChargeRecognitionCase>;
-  deleteChargeRecognitionCase: (id: string) => Promise<void>;
-  saveCatalogCorrectionRequest: (draft: CatalogCorrectionDraft) => Promise<CatalogCorrectionRequest>;
-  deleteCatalogCorrectionRequest: (id: string) => Promise<void>;
+  addSubscription(draft: SubscriptionDraft): Promise<SubscriptionRecord>;
+  updateSubscription(id: string, draft: SubscriptionDraft): Promise<SubscriptionRecord | undefined>;
+  updateDecisionSupport(id: string, patch: Pick<SubscriptionRecord, "intentTags" | "renewalDecisionPlan" | "valueCheckIn">): Promise<void>;
+  updateStatus(id: string, status: SubscriptionRecord["status"]): Promise<void>;
+  beginCancellationFollowUp(id: string): Promise<void>;
+  confirmCancellation(id: string): Promise<void>;
+  deleteSubscription(id: string): Promise<void>;
+  restoreSubscription(record: SubscriptionRecord): Promise<void>;
+  updateSettings(patch: Partial<AppSettings>): Promise<void>;
+  addHouseholdMember(name: string): Promise<HouseholdMember | undefined>;
+  removeHouseholdMember(id: string): Promise<void>;
+  replaceLocalSnapshot(snapshot: LocalSubscriptionSnapshot): Promise<void>;
+  getLocalBackups(): Promise<LocalBackup[]>;
+  resetLocalData(): Promise<void>;
+  saveChargeRecognitionCase(draft: ChargeRecognitionDraft): Promise<ChargeRecognitionCase>;
+  deleteChargeRecognitionCase(id: string): Promise<void>;
+  saveCatalogCorrectionRequest(draft: CatalogCorrectionDraft): Promise<CatalogCorrectionRequest>;
+  deleteCatalogCorrectionRequest(id: string): Promise<void>;
+  addSavingsEntry(draft: Omit<SavingsEntry, "id">): Promise<void>;
+  deleteSavingsEntry(id: string): Promise<void>;
 }
+const Store = createContext<SubscriptionStoreValue | undefined>(undefined);
+const newId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+const now = () => new Date().toISOString();
 
-const SubscriptionStore = createContext<SubscriptionStoreValue | undefined>(undefined);
-
+function normalizeRecord(record: SubscriptionRecord, members: HouseholdMember[]): SubscriptionRecord {
+  return {
+    ...record, currency: record.currency.trim().toUpperCase(),
+    autoRenewStatus: record.autoRenewStatus ?? "unknown", cancellationState: record.cancellationState ?? "none",
+    sharedMemberIds: [...new Set(["owner", ...(record.sharedMemberIds ?? [])])].filter((id) => members.some((member) => member.id === id)),
+  };
+}
+async function withReminders(record: SubscriptionRecord, settings: AppSettings) {
+  await cancelSubscriptionReminders(record);
+  const identifiers = settings.notificationsEnabled ? await scheduleSubscriptionReminders(record, settings.reminderDays) : [];
+  return { ...record, reminderIdentifier: identifiers[0], reminderIdentifiers: identifiers };
+}
 export function SubscriptionProvider({ children }: PropsWithChildren) {
-  const [isReady, setIsReady] = useState(false);
-  const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
-  const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([ownerMember]);
-  const [chargeRecognitionCases, setChargeRecognitionCases] = useState<ChargeRecognitionCase[]>([]);
-  const [catalogCorrectionRequests, setCatalogCorrectionRequests] = useState<CatalogCorrectionRequest[]>([]);
-
+  const [state, setState] = useState<ValidatedSnapshot>(emptySnapshot);
+  const [isReady, setReady] = useState(false);
+  const [storageError, setStorageError] = useState<string>();
+  const [repository] = useState(() => new LocalStateRepository(AsyncStorage, setState));
   useEffect(() => {
-    let isMounted = true;
-    const hydrationTimeout = setTimeout(() => {
-      if (isMounted) setIsReady(true);
-    }, 1200);
+    let mounted = true;
+    void repository.load().then(() => { if (mounted) { setStorageError(repository.recoveryError); setReady(true); } })
+      .catch(() => { if (mounted) { setStorageError("Storage is unavailable. Retry opening the app before making changes."); } });
+    return () => { mounted = false; };
+  }, [repository]);
 
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((serialized) => {
-        if (!isMounted || !serialized) return;
-        const parsed = JSON.parse(serialized) as Partial<StoredState>;
-        const nextMembers = normalizeHouseholdMembers(parsed.householdMembers);
-        setHouseholdMembers(nextMembers);
-        setSubscriptions((parsed.subscriptions ?? []).map((item) => ({
-          ...item,
-          sharedMemberIds: normalizeSharedMemberIds(item.sharedMemberIds, nextMembers),
-        })));
-        setChargeRecognitionCases((parsed.chargeRecognitionCases ?? []).filter((item) => item.merchantLabel?.trim()));
-        setCatalogCorrectionRequests((parsed.catalogCorrectionRequests ?? []).filter((item) => item.serviceName?.trim() && item.country?.trim()));
-        setSettings({ ...defaultSettings, ...(parsed.settings ?? {}) });
-      })
-      .catch(() => {
-        // If local data is malformed, start from a safe empty state.
-      })
-      .finally(() => {
-        clearTimeout(hydrationTimeout);
-        if (isMounted) setIsReady(true);
+  const actions = useMemo(() => {
+    const update = async (recipe: (current: ValidatedSnapshot) => ValidatedSnapshot | Promise<ValidatedSnapshot>, recovery = false) => {
+      await repository.update(recipe, recovery);
+      setStorageError(repository.recoveryError);
+    };
+    const modify = async (id: string, transform: (record: SubscriptionRecord, current: ValidatedSnapshot) => SubscriptionRecord) => {
+      let result: SubscriptionRecord | undefined;
+      await update(async (current) => {
+        const record = current.subscriptions.find((item) => item.id === id);
+        if (!record) return current;
+        const candidate = normalizeRecord({ ...transform(record, current), updatedAt: now() }, current.householdMembers);
+        snapshotSchema.parse({ ...current, subscriptions: current.subscriptions.map((item) => item.id === id ? candidate : item) });
+        result = await withReminders(candidate, current.settings);
+        return { ...current, subscriptions: current.subscriptions.map((item) => item.id === id ? result! : item) };
       });
-
-    return () => {
-      isMounted = false;
-      clearTimeout(hydrationTimeout);
+      return result;
     };
-  }, []);
-
-  const persist = useCallback(async (nextSubscriptions: SubscriptionRecord[], nextSettings: AppSettings, nextMembers = householdMembers, nextChargeRecognitionCases = chargeRecognitionCases, nextCatalogCorrectionRequests = catalogCorrectionRequests) => {
-    setSubscriptions(nextSubscriptions);
-    setSettings(nextSettings);
-    setHouseholdMembers(nextMembers);
-    setChargeRecognitionCases(nextChargeRecognitionCases);
-    setCatalogCorrectionRequests(nextCatalogCorrectionRequests);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ subscriptions: nextSubscriptions, settings: nextSettings, householdMembers: nextMembers, chargeRecognitionCases: nextChargeRecognitionCases, catalogCorrectionRequests: nextCatalogCorrectionRequests } satisfies StoredState));
-  }, [catalogCorrectionRequests, chargeRecognitionCases, householdMembers]);
-
-  const addSubscription = useCallback(
-    async (draft: SubscriptionDraft) => {
-      const now = new Date().toISOString();
-      let record: SubscriptionRecord = {
-        ...draft,
-        autoRenewStatus: draft.autoRenewStatus ?? "unknown",
-        cancellationState: draft.cancellationState ?? "none",
-        sharedMemberIds: normalizeSharedMemberIds(draft.sharedMemberIds, householdMembers),
-        id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        createdAt: now,
-        updatedAt: now,
-      };
-      if (settings.notificationsEnabled) {
-        record = { ...record, reminderIdentifier: await scheduleRenewalReminder(record, settings.reminderDays) };
-      }
-      const next = [record, ...subscriptions];
-      await persist(next, settings);
-      return record;
-    },
-    [householdMembers, persist, settings, subscriptions],
-  );
-
-  const updateSubscription = useCallback(
-    async (id: string, draft: SubscriptionDraft) => {
-      const current = subscriptions.find((item) => item.id === id);
-      if (!current) return undefined;
-      await cancelRenewalReminder(current.reminderIdentifier);
-      const updatedAt = new Date().toISOString();
-      const fieldsChanged = current.planName !== draft.planName || current.amount !== draft.amount || current.currency.toUpperCase() !== draft.currency.toUpperCase() || current.cadence !== draft.cadence;
-      const changeEvent: PlanChangeEvent | undefined = fieldsChanged ? {
-        id: `plan_change_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        changedAt: updatedAt,
-        previousPlanName: current.planName,
-        nextPlanName: draft.planName,
-        previousAmount: current.amount,
-        nextAmount: draft.amount,
-        previousCurrency: current.currency,
-        nextCurrency: draft.currency.toUpperCase(),
-        previousCadence: current.cadence,
-        nextCadence: draft.cadence,
-      } : undefined;
-      let updated: SubscriptionRecord = {
-        ...current,
-        ...draft,
-        autoRenewStatus: draft.autoRenewStatus ?? current.autoRenewStatus ?? "unknown",
-        cancellationState: draft.cancellationState ?? current.cancellationState ?? "none",
-        sharedMemberIds: normalizeSharedMemberIds(draft.sharedMemberIds ?? current.sharedMemberIds, householdMembers),
-        planChangeHistory: changeEvent ? [changeEvent, ...(current.planChangeHistory ?? [])].slice(0, 50) : current.planChangeHistory,
-        updatedAt,
-        reminderIdentifier: undefined,
-      };
-      if (settings.notificationsEnabled) {
-        updated = { ...updated, reminderIdentifier: await scheduleRenewalReminder(updated, settings.reminderDays) };
-      }
-      const next = subscriptions.map((item) => (item.id === id ? updated : item));
-      await persist(next, settings);
-      return updated;
-    },
-    [householdMembers, persist, settings, subscriptions],
-  );
-
-  const updateStatus = useCallback(
-    async (id: string, status: SubscriptionRecord["status"]) => {
-      const current = subscriptions.find((item) => item.id === id);
-      if (!current) return;
-      if (status === "cancelled") await cancelRenewalReminder(current.reminderIdentifier);
-      const shouldClearFollowUp = status !== "cancelled" && current.cancellationState === "pending";
-      let updated = {
-        ...current,
-        status,
-        ...(shouldClearFollowUp ? { cancellationState: "none" as const, cancellationRequestedAt: undefined, cancellationConfirmedAt: undefined, cancellationConfirmationReference: undefined, cancellationExpectedEndDate: undefined, cancellationFollowUpDate: undefined, cancellationFollowUpCompletedAt: undefined } : {}),
-        updatedAt: new Date().toISOString(),
-      };
-      if (status !== "cancelled" && settings.notificationsEnabled && !updated.reminderIdentifier) {
-        updated = { ...updated, reminderIdentifier: await scheduleRenewalReminder(updated, settings.reminderDays) };
-      }
-      await persist(subscriptions.map((item) => (item.id === id ? updated : item)), settings);
-    },
-    [persist, settings, subscriptions],
-  );
-
-  const updateDecisionSupport = useCallback(async (id: string, patch: Pick<SubscriptionRecord, "intentTags" | "renewalDecisionPlan" | "valueCheckIn">) => {
-    const current = subscriptions.find((item) => item.id === id);
-    if (!current) return;
-    const updated: SubscriptionRecord = { ...current, ...patch, updatedAt: new Date().toISOString() };
-    await persist(subscriptions.map((item) => (item.id === id ? updated : item)), settings);
-  }, [persist, settings, subscriptions]);
-
-  const beginCancellationFollowUp = useCallback(async (id: string) => {
-    const current = subscriptions.find((item) => item.id === id);
-    if (!current) return;
-    const updated: SubscriptionRecord = {
-      ...current,
-      status: "uncertain",
-      cancellationState: "pending",
-      cancellationRequestedAt: new Date().toISOString(),
-      cancellationConfirmedAt: undefined,
-      cancellationFollowUpDate: nextLocalDateKey(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-      cancellationFollowUpCompletedAt: undefined,
-      updatedAt: new Date().toISOString(),
+    return {
+      async addSubscription(draft: SubscriptionDraft) {
+        let record!: SubscriptionRecord;
+        await update(async (current) => {
+          record = normalizeRecord({ ...draft, id: newId("sub"), createdAt: now(), updatedAt: now() }, current.householdMembers);
+          // Validate before scheduling a notification or mutating storage.
+          snapshotSchema.parse({ ...current, subscriptions: [record, ...current.subscriptions] });
+          record = await withReminders(record, current.settings);
+          return { ...current, subscriptions: [record, ...current.subscriptions] };
+        });
+        return record;
+      },
+      async updateSubscription(id: string, draft: SubscriptionDraft) {
+        return modify(id, (record) => {
+          const changed = record.planName !== draft.planName || record.amount !== draft.amount || record.currency !== draft.currency.toUpperCase() || record.cadence !== draft.cadence;
+          const event: PlanChangeEvent = {
+            id: newId("change"), changedAt: now(), previousPlanName: record.planName, nextPlanName: draft.planName,
+            previousAmount: record.amount, nextAmount: draft.amount, previousCurrency: record.currency, nextCurrency: draft.currency.toUpperCase(),
+            previousCadence: record.cadence, nextCadence: draft.cadence,
+          };
+          return { ...record, ...draft, planChangeHistory: changed ? [event, ...(record.planChangeHistory ?? [])].slice(0, 50) : record.planChangeHistory };
+        });
+      },
+      async updateDecisionSupport(id: string, patch: Pick<SubscriptionRecord, "intentTags" | "renewalDecisionPlan" | "valueCheckIn">) { await modify(id, (record) => ({ ...record, ...patch })); },
+      async updateStatus(id: string, status: SubscriptionRecord["status"]) {
+        await modify(id, (record) => ({ ...record, status,
+          ...(status !== "cancelled" && record.cancellationState === "confirmed" ? { cancellationState: "none", cancellationConfirmedAt: undefined, cancellationFollowUpCompletedAt: undefined } : {}),
+        }));
+      },
+      async beginCancellationFollowUp(id: string) {
+        const followUp = new Date(); followUp.setDate(followUp.getDate() + 7);
+        await modify(id, (record) => ({
+          ...record, status: "uncertain", cancellationState: "pending", cancellationRequestedAt: now(),
+          cancellationConfirmedAt: undefined, cancellationFollowUpCompletedAt: undefined,
+          cancellationFollowUpDate: localDateKey(followUp),
+        }));
+      },
+      async confirmCancellation(id: string) {
+        await modify(id, (record) => ({ ...record, status: "cancelled", cancellationState: "confirmed", cancellationConfirmedAt: now(), cancellationFollowUpCompletedAt: now() }));
+      },
+      async deleteSubscription(id: string) {
+        await update(async (current) => {
+          const record = current.subscriptions.find((item) => item.id === id);
+          if (record) await cancelSubscriptionReminders(record);
+          return { ...current, subscriptions: current.subscriptions.filter((item) => item.id !== id) };
+        });
+      },
+      async restoreSubscription(record: SubscriptionRecord) {
+        await update(async (current) => {
+          if (current.subscriptions.some((item) => item.id === record.id)) return current;
+          const restored = await withReminders(normalizeRecord({ ...record, reminderIdentifier: undefined, reminderIdentifiers: undefined, updatedAt: now() }, current.householdMembers), current.settings);
+          return { ...current, subscriptions: [restored, ...current.subscriptions] };
+        });
+      },
+      async updateSettings(patch: Partial<AppSettings>) {
+        await update(async (current) => {
+          const settings = { ...current.settings, ...patch };
+          snapshotSchema.parse({ ...current, settings });
+          const refresh = "reminderDays" in patch || "notificationsEnabled" in patch;
+          const subscriptions = refresh ? await Promise.all(current.subscriptions.map((item) => withReminders(item, settings))) : current.subscriptions;
+          return { ...current, settings, subscriptions };
+        });
+      },
+      async addHouseholdMember(name: string) {
+        let member: HouseholdMember | undefined;
+        await update((current) => {
+          const cleanName = name.trim().replace(/\s+/g, " ");
+          if (!cleanName || current.householdMembers.some((item) => item.name.toLowerCase() === cleanName.toLowerCase())) return current;
+          member = { id: newId("member"), name: cleanName, color: "#667D28", createdAt: now() };
+          return { ...current, householdMembers: [...current.householdMembers, member] };
+        });
+        return member;
+      },
+      async removeHouseholdMember(id: string) {
+        if (id === "owner") return;
+        await update((current) => ({
+          ...current, householdMembers: current.householdMembers.filter((item) => item.id !== id),
+          subscriptions: current.subscriptions.map((item) => item.sharedMemberIds?.includes(id)
+            ? { ...item, sharedMemberIds: item.sharedMemberIds.filter((memberId) => memberId !== id), sharedMemberShares: undefined }
+            : item),
+        }));
+      },
+      async replaceLocalSnapshot(snapshot: LocalSubscriptionSnapshot) {
+        const safe = portableSnapshot(snapshot);
+        const members = safe.householdMembers.some((member) => member.id === "owner") ? safe.householdMembers : [emptySnapshot().householdMembers[0], ...safe.householdMembers];
+        await update(async (current) => {
+          await Promise.all(current.subscriptions.map(cancelSubscriptionReminders));
+          return { ...safe, householdMembers: members, subscriptions: await Promise.all(safe.subscriptions.map((item) => withReminders(normalizeRecord(item, members), safe.settings))) };
+        }, true);
+      },
+      getLocalBackups: () => repository.backups(),
+      async resetLocalData() {
+        await update(async (current) => {
+          await Promise.all(current.subscriptions.map(cancelSubscriptionReminders));
+          return emptySnapshot();
+        }, true);
+        await AsyncStorage.multiRemove([BACKUP_KEY, "subtrack.unreadable-state.v1"]);
+      },
+      async saveChargeRecognitionCase(draft: ChargeRecognitionDraft) {
+        const record = { ...draft, merchantLabel: draft.merchantLabel.trim(), currency: draft.currency?.toUpperCase(), id: newId("charge"), createdAt: now(), updatedAt: now() };
+        await update((current) => ({ ...current, chargeRecognitionCases: [record, ...(current.chargeRecognitionCases ?? [])] }));
+        return record;
+      },
+      async deleteChargeRecognitionCase(id: string) { await update((current) => ({ ...current, chargeRecognitionCases: current.chargeRecognitionCases?.filter((item) => item.id !== id) })); },
+      async saveCatalogCorrectionRequest(draft: CatalogCorrectionDraft) {
+        const record = { ...draft, serviceName: draft.serviceName.trim(), country: draft.country.trim().toUpperCase(), id: newId("correction"), createdAt: now() };
+        await update((current) => ({ ...current, catalogCorrectionRequests: [record, ...(current.catalogCorrectionRequests ?? [])] }));
+        return record;
+      },
+      async deleteCatalogCorrectionRequest(id: string) { await update((current) => ({ ...current, catalogCorrectionRequests: current.catalogCorrectionRequests?.filter((item) => item.id !== id) })); },
+      async addSavingsEntry(draft: Omit<SavingsEntry, "id">) { await update((current) => ({ ...current, savingsEntries: [{ ...draft, id: newId("saving") }, ...(current.savingsEntries ?? [])] })); },
+      async deleteSavingsEntry(id: string) { await update((current) => ({ ...current, savingsEntries: current.savingsEntries?.filter((item) => item.id !== id) })); },
     };
-    await persist(subscriptions.map((item) => (item.id === id ? updated : item)), settings);
-  }, [persist, settings, subscriptions]);
-
-  const confirmCancellation = useCallback(async (id: string) => {
-    const current = subscriptions.find((item) => item.id === id);
-    if (!current) return;
-    await cancelRenewalReminder(current.reminderIdentifier);
-    const updated: SubscriptionRecord = {
-      ...current,
-      status: "cancelled",
-      cancellationState: "confirmed",
-      cancellationConfirmedAt: new Date().toISOString(),
-      cancellationFollowUpCompletedAt: new Date().toISOString(),
-      reminderIdentifier: undefined,
-      updatedAt: new Date().toISOString(),
-    };
-    await persist(subscriptions.map((item) => (item.id === id ? updated : item)), settings);
-  }, [persist, settings, subscriptions]);
-
-  const deleteSubscription = useCallback(
-    async (id: string) => {
-      const current = subscriptions.find((item) => item.id === id);
-      await cancelRenewalReminder(current?.reminderIdentifier);
-      await persist(subscriptions.filter((item) => item.id !== id), settings);
-    },
-    [persist, settings, subscriptions],
-  );
-
-  const restoreSubscription = useCallback(
-    async (record: SubscriptionRecord) => {
-      if (subscriptions.some((item) => item.id === record.id)) return;
-      let restored: SubscriptionRecord = {
-        ...record,
-        sharedMemberIds: normalizeSharedMemberIds(record.sharedMemberIds, householdMembers),
-        reminderIdentifier: undefined,
-        updatedAt: new Date().toISOString(),
-      };
-      if (settings.notificationsEnabled && restored.reminderEnabled && restored.status !== "cancelled") {
-        restored = { ...restored, reminderIdentifier: await scheduleRenewalReminder(restored, settings.reminderDays) };
-      }
-      await persist([restored, ...subscriptions], settings);
-    },
-    [householdMembers, persist, settings, subscriptions],
-  );
-
-  const updateSettings = useCallback(
-    async (patch: Partial<AppSettings>) => {
-      const nextSettings = { ...settings, ...patch };
-      const shouldRefreshReminders = Object.prototype.hasOwnProperty.call(patch, "reminderDays") || Object.prototype.hasOwnProperty.call(patch, "notificationsEnabled");
-      if (!shouldRefreshReminders) {
-        await persist(subscriptions, nextSettings);
-        return;
-      }
-      const refreshed = await Promise.all(
-        subscriptions.map(async (item) => {
-          await cancelRenewalReminder(item.reminderIdentifier);
-          const cleared = { ...item, reminderIdentifier: undefined };
-          if (nextSettings.notificationsEnabled && cleared.reminderEnabled && cleared.status !== "cancelled") {
-            return { ...cleared, reminderIdentifier: await scheduleRenewalReminder(cleared, nextSettings.reminderDays) };
-          }
-          return cleared;
-        }),
-      );
-      await persist(refreshed, nextSettings);
-    },
-    [persist, settings, subscriptions],
-  );
-
-  const addHouseholdMember = useCallback(async (name: string) => {
-    const normalizedName = name.trim().replace(/\s+/g, " ");
-    if (!normalizedName || householdMembers.some((member) => member.name.toLowerCase() === normalizedName.toLowerCase())) return undefined;
-    const member: HouseholdMember = {
-      id: `member_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      name: normalizedName,
-      color: memberColors[householdMembers.length % memberColors.length],
-      createdAt: new Date().toISOString(),
-    };
-    await persist(subscriptions, settings, [...householdMembers, member]);
-    return member;
-  }, [householdMembers, persist, settings, subscriptions]);
-
-  const removeHouseholdMember = useCallback(async (id: string) => {
-    if (id === ownerMember.id) return;
-    const nextMembers = householdMembers.filter((member) => member.id !== id);
-    const nextSubscriptions = subscriptions.map((item) => ({
-      ...item,
-      sharedMemberIds: normalizeSharedMemberIds(item.sharedMemberIds?.filter((memberId) => memberId !== id), nextMembers),
-    }));
-    await persist(nextSubscriptions, settings, nextMembers);
-  }, [householdMembers, persist, settings, subscriptions]);
-
-  const replaceLocalSnapshot = useCallback(async (snapshot: LocalSubscriptionSnapshot) => {
-    const nextMembers = normalizeHouseholdMembers(snapshot.householdMembers);
-    const nextSettings = { ...defaultSettings, ...snapshot.settings };
-    await Promise.all(subscriptions.map((item) => cancelRenewalReminder(item.reminderIdentifier)));
-    const nextSubscriptions = await Promise.all(
-      snapshot.subscriptions.map(async (item) => {
-        const restored: SubscriptionRecord = {
-          ...item,
-          reminderIdentifier: undefined,
-          sharedMemberIds: normalizeSharedMemberIds(item.sharedMemberIds, nextMembers),
-        };
-        if (nextSettings.notificationsEnabled && restored.reminderEnabled && restored.status !== "cancelled") {
-          return { ...restored, reminderIdentifier: await scheduleRenewalReminder(restored, nextSettings.reminderDays) };
-        }
-        return restored;
-      }),
-    );
-    await persist(nextSubscriptions, nextSettings, nextMembers);
-  }, [persist, subscriptions]);
-
-  const resetLocalData = useCallback(async () => {
-    await Promise.all(subscriptions.map((item) => cancelRenewalReminder(item.reminderIdentifier)));
-    await AsyncStorage.removeItem(STORAGE_KEY);
-    setSubscriptions([]);
-    setSettings(defaultSettings);
-    setHouseholdMembers([ownerMember]);
-    setChargeRecognitionCases([]);
-    setCatalogCorrectionRequests([]);
-  }, [subscriptions]);
-
-  const saveChargeRecognitionCase = useCallback(async (draft: ChargeRecognitionDraft) => {
-    const now = new Date().toISOString();
-    const record: ChargeRecognitionCase = {
-      ...draft,
-      merchantLabel: draft.merchantLabel.trim(),
-      currency: draft.currency?.trim().toUpperCase() || undefined,
-      accountAlias: draft.accountAlias?.trim() || undefined,
-      notes: draft.notes?.trim() || undefined,
-      id: `charge_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await persist(subscriptions, settings, householdMembers, [record, ...chargeRecognitionCases]);
-    return record;
-  }, [chargeRecognitionCases, householdMembers, persist, settings, subscriptions]);
-
-  const deleteChargeRecognitionCase = useCallback(async (id: string) => {
-    await persist(subscriptions, settings, householdMembers, chargeRecognitionCases.filter((item) => item.id !== id));
-  }, [chargeRecognitionCases, householdMembers, persist, settings, subscriptions]);
-
-  const saveCatalogCorrectionRequest = useCallback(async (draft: CatalogCorrectionDraft) => {
-    const record: CatalogCorrectionRequest = {
-      ...draft,
-      serviceName: draft.serviceName.trim(),
-      country: draft.country.trim().toUpperCase(),
-      planName: draft.planName?.trim() || undefined,
-      observedPrice: draft.observedPrice?.trim() || undefined,
-      sourceUrl: draft.sourceUrl?.trim() || undefined,
-      note: draft.note?.trim() || undefined,
-      id: `catalog_fix_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: new Date().toISOString(),
-    };
-    await persist(subscriptions, settings, householdMembers, chargeRecognitionCases, [record, ...catalogCorrectionRequests]);
-    return record;
-  }, [catalogCorrectionRequests, chargeRecognitionCases, householdMembers, persist, settings, subscriptions]);
-
-  const deleteCatalogCorrectionRequest = useCallback(async (id: string) => {
-    await persist(subscriptions, settings, householdMembers, chargeRecognitionCases, catalogCorrectionRequests.filter((item) => item.id !== id));
-  }, [catalogCorrectionRequests, chargeRecognitionCases, householdMembers, persist, settings, subscriptions]);
-
-  const value = useMemo(
-    () => ({ isReady, subscriptions, settings, householdMembers, chargeRecognitionCases, catalogCorrectionRequests, addSubscription, updateSubscription, updateDecisionSupport, updateStatus, beginCancellationFollowUp, confirmCancellation, deleteSubscription, restoreSubscription, updateSettings, addHouseholdMember, removeHouseholdMember, replaceLocalSnapshot, resetLocalData, saveChargeRecognitionCase, deleteChargeRecognitionCase, saveCatalogCorrectionRequest, deleteCatalogCorrectionRequest }),
-    [addHouseholdMember, addSubscription, beginCancellationFollowUp, catalogCorrectionRequests, chargeRecognitionCases, confirmCancellation, deleteCatalogCorrectionRequest, deleteChargeRecognitionCase, deleteSubscription, householdMembers, isReady, removeHouseholdMember, replaceLocalSnapshot, resetLocalData, restoreSubscription, saveCatalogCorrectionRequest, saveChargeRecognitionCase, settings, subscriptions, updateDecisionSupport, updateStatus, updateSubscription],
-  );
-
-  return <SubscriptionStore.Provider value={value}>{children}</SubscriptionStore.Provider>;
+  }, [repository]);
+  const value = useMemo(() => ({ ...state, chargeRecognitionCases: state.chargeRecognitionCases ?? [], catalogCorrectionRequests: state.catalogCorrectionRequests ?? [], isReady, storageError, ...actions }), [state, isReady, storageError, actions]);
+  return <Store.Provider value={value}>{children}</Store.Provider>;
 }
-
 export function useSubscriptions() {
-  const value = useContext(SubscriptionStore);
+  const value = useContext(Store);
   if (!value) throw new Error("useSubscriptions must be used within SubscriptionProvider");
   return value;
 }

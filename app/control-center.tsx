@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { useMemo } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -20,7 +21,9 @@ const issueTone: Record<SubscriptionControlIssueKind, { glyph: string; color: st
   "uncertain-status": { glyph: "?", color: "#C9F72D", background: "#2A3511" },
 };
 
+const baseStyles = () => styles;
 function IssueRow({ issue }: { issue: SubscriptionControlIssue }) {
+  const styles = useThemedStyles(baseStyles());
   const tone = issueTone[issue.kind];
   const firstSubscription = issue.subscriptionIds[0];
   return <Pressable accessibilityRole="button" accessibilityLabel={`Review: ${issue.title}`} onPress={() => firstSubscription && router.push(`/subscription/${firstSubscription}` as never)} style={({ pressed }) => [styles.issue, pressed && styles.pressed]}>
@@ -30,6 +33,7 @@ function IssueRow({ issue }: { issue: SubscriptionControlIssue }) {
 }
 
 export default function ControlCenterScreen() {
+  const styles = useThemedStyles(baseStyles());
   const { isReady, subscriptions } = useSubscriptions();
   const issues = useMemo(() => getSubscriptionControlIssues(subscriptions), [subscriptions]);
   const activeCount = subscriptions.filter((item) => item.status !== "cancelled").length;

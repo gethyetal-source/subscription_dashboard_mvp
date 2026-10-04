@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { PrimaryButton, ServiceBadge } from "@/components/subscription-ui";
@@ -7,7 +8,9 @@ import { ScreenContainer } from "@/components/screen-container";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
+const baseStyles = () => styles;
 export default function ComparePlansScreen() {
+  const styles = useThemedStyles(baseStyles());
   const { serviceId } = useLocalSearchParams<{ serviceId: string }>(); const service = getService(serviceId);
   if (!service) return <ScreenContainer className="p-5"><Text>Service not found.</Text></ScreenContainer>;
   return <ScreenContainer className="px-5" containerClassName="bg-background"><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -15,6 +18,7 @@ export default function ComparePlansScreen() {
     <View style={styles.heading}><ServiceBadge serviceId={service.id} /><View><Text style={styles.title}>{service.name}</Text><Text style={styles.subtitle}>Plan overview</Text></View></View>
     <View style={styles.notice}><Text style={styles.noticeText}>Plans, prices, and eligibility can vary by country. Confirm the official provider terms before changing or buying a plan.</Text></View>
     <View style={styles.plans}>{service.plans.map((plan, index) => <View key={plan.id} style={[styles.plan, index === 1 && styles.featured]}><Text style={styles.kicker}>{index === 1 ? "POPULAR OPTION" : "PLAN"}</Text><Text style={styles.planName}>{plan.name}</Text><Text style={styles.price}>{plan.priceLabel}</Text><Text style={styles.cadence}>{plan.cadence === "yearly" ? "Annual billing" : "Billing depends on the selected plan"}</Text><View style={styles.line} />{plan.features.map((feature) => <View key={feature} style={styles.feature}><Text style={styles.check}>✓</Text><Text style={styles.featureText}>{feature}</Text></View>)}</View>)}</View>
+    <PrimaryButton label="Compare current regional quotes" onPress={() => router.push({ pathname: "/regional-plans", params: { serviceId: service.id } } as never)} />
     <PrimaryButton label="Add my actual subscription" onPress={() => router.push(`/subscription/edit?serviceId=${service.id}` as never)} />
   </ScrollView></ScreenContainer>;
 }

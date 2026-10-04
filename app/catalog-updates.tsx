@@ -1,4 +1,5 @@
 import * as WebBrowser from "expo-web-browser";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -14,7 +15,9 @@ function statusCopy(status: CatalogPriceInboxItem["status"]) {
   return "Manual source review";
 }
 
+const baseStyles = () => styles;
 export default function CatalogUpdatesScreen() {
+  const styles = useThemedStyles(baseStyles());
   const { catalogCorrectionRequests } = useSubscriptions();
   const summary = getCatalogInboxSummary(catalogCorrectionRequests);
   return <ScreenContainer className="px-5" containerClassName="bg-background" edges={["top", "bottom", "left", "right"]}>

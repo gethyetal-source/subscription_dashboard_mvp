@@ -1,4 +1,5 @@
 import * as WebBrowser from "expo-web-browser";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
@@ -13,7 +14,9 @@ import { getChargeRecognitionMatches, getChargeRecognitionSupportCopy, isValidDa
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 type WorksheetRow = { id: string; kind: "heading"; title: string } | { id: string; kind: "match"; subscriptionId: string; reasons: string[] } | { id: string; kind: "case"; caseId: string };
 
+const baseStyles = () => styles;
 export default function ChargeRecognitionScreen() {
+  const styles = useThemedStyles(baseStyles());
   const { subscriptions, chargeRecognitionCases, saveChargeRecognitionCase, deleteChargeRecognitionCase } = useSubscriptions();
   const [merchantLabel, setMerchantLabel] = useState("");
   const [amount, setAmount] = useState("");

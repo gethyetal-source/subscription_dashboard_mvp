@@ -5,8 +5,12 @@ import { useState } from "react";
 
 import { getService, serviceLogoSources } from "@/lib/catalog";
 import type { SubscriptionRecord } from "@/lib/subscription-types";
-import { formatCurrency, formatRelativeRenewal, monthlyAmount } from "@/lib/subscription-utils";
+import { formatRelativeRenewal, getHouseholdAllocation, monthlyAmount } from "@/lib/subscription-utils";
 import { useThemeContext } from "@/lib/theme-provider";
+import { useMoneyFormatter } from "@/lib/privacy";
+import { useThemedStyles } from "@/lib/ui-theme";
+
+const baseStyles = () => styles;
 
 const type = {
   regular: "Poppins-Regular",
@@ -16,6 +20,7 @@ const type = {
 };
 
 export function ServiceBadge({ serviceId, size = "regular" }: { serviceId: string; size?: "small" | "regular" | "large" }) {
+  const styles = useThemedStyles(baseStyles());
   const service = getService(serviceId);
   const [failed, setFailed] = useState(false);
   const dimension = size === "small" ? 36 : size === "large" ? 54 : 42;
@@ -29,33 +34,39 @@ export function ServiceBadge({ serviceId, size = "regular" }: { serviceId: strin
 }
 
 export function Pill({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "teal" | "amber" | "coral" }) {
+  const styles = useThemedStyles(baseStyles());
   const fill = tone === "teal" ? styles.pillGreen : tone === "amber" ? styles.pillAmber : tone === "coral" ? styles.pillRed : styles.pillNeutral;
   const labelStyle = tone === "teal" ? styles.pillLabelGreen : tone === "amber" ? styles.pillLabelAmber : tone === "coral" ? styles.pillLabelRed : styles.pillLabelNeutral;
   return <View style={[styles.pill, fill]}><Text style={[styles.pillLabel, labelStyle]}>{label}</Text></View>;
 }
 
 export function SectionLabel({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  const styles = useThemedStyles(baseStyles());
   const { colorScheme } = useThemeContext();
   const sectionTheme = colorScheme === "dark" ? sectionThemes.dark : sectionThemes.light;
   return <View style={styles.sectionRow}><Text style={[styles.sectionTitle, sectionTheme.title]}>{title}</Text>{action && onAction ? <Pressable hitSlop={10} onPress={onAction}><Text style={[styles.sectionAction, sectionTheme.action]}>{action}</Text></Pressable> : null}</View>;
 }
 
 export function PrimaryButton({ label, onPress, style, disabled = false }: { label: string; onPress: () => void; style?: ViewStyle; disabled?: boolean }) {
-  return <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.primaryButton, style, (pressed || disabled) && styles.buttonPressed, disabled && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>{label}</Text></Pressable>;
+  const styles = useThemedStyles(baseStyles());
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.primaryButton, style, (pressed || disabled) && styles.buttonPressed, disabled && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>{label}</Text></Pressable>;
 }
 
 export function SecondaryButton({ label, onPress, style }: { label: string; onPress: () => void; style?: ViewStyle }) {
-  return <Pressable onPress={onPress} style={({ pressed }) => [styles.secondaryButton, style, pressed && styles.buttonPressed]}><Text style={styles.secondaryButtonText}>{label}</Text></Pressable>;
+  const styles = useThemedStyles(baseStyles());
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.secondaryButton, style, pressed && styles.buttonPressed]}><Text style={styles.secondaryButtonText}>{label}</Text></Pressable>;
 }
 
 export function SubscriptionRow({ item, onPress, onQuickEdit, onDelete }: { item: SubscriptionRecord; onPress: () => void; onQuickEdit?: () => void; onDelete?: () => void }) {
+  const styles = useThemedStyles(baseStyles());
+  const formatCurrency = useMoneyFormatter();
   const service = getService(item.serviceId);
   const tone = item.status === "trial" ? "amber" : item.status === "cancelled" ? "coral" : item.status === "uncertain" ? "neutral" : "teal";
   return (
     <View style={styles.subscriptionCard}>
       <Pressable onPress={onPress} style={({ pressed }) => [styles.subscriptionRow, pressed && styles.rowPressed]}>
         <ServiceBadge serviceId={item.serviceId} />
-        <View style={styles.subscriptionCopy}><Text style={styles.subscriptionName}>{service?.name ?? "Subscription"}</Text><Text style={styles.subscriptionMeta}>{item.planName} · {formatRelativeRenewal(item.renewalDate)}</Text>{(item.sharedMemberIds?.length ?? 1) > 1 ? <Text style={styles.sharedHint}>Shared plan · {formatCurrency(monthlyAmount(item.amount, item.cadence) / (item.sharedMemberIds?.length ?? 1), item.currency)} each / month</Text> : null}</View>
+        <View style={styles.subscriptionCopy}><Text style={styles.subscriptionName}>{service?.name ?? item.planName}</Text><Text style={styles.subscriptionMeta}>{item.planName} · {formatRelativeRenewal(item.renewalDate)}</Text>{(item.sharedMemberIds?.length ?? 1) > 1 ? <Text style={styles.sharedHint}>Shared plan · your share {formatCurrency(monthlyAmount(item.amount, item.cadence) * getHouseholdAllocation(item.sharedMemberIds ?? [], item.sharedMemberShares).owner / 100, item.currency)} / month</Text> : null}</View>
         <View style={styles.subscriptionAmount}><Text style={styles.amount}>{formatCurrency(item.amount, item.currency)}</Text><Pill label={item.status} tone={tone} /></View>
         <Text style={styles.chevron}>›</Text>
       </Pressable>
@@ -65,13 +76,14 @@ export function SubscriptionRow({ item, onPress, onQuickEdit, onDelete }: { item
 }
 
 export function EmptyState({ title, body }: { title: string; body: string }) {
+  const styles = useThemedStyles(baseStyles());
   return <View style={styles.emptyState}><View style={styles.emptySymbol}><Text style={styles.emptySymbolText}>+</Text></View><Text style={styles.emptyTitle}>{title}</Text><Text style={styles.emptyBody}>{body}</Text></View>;
 }
 
 const styles = StyleSheet.create({
   badge: { alignItems: "center", backgroundColor: "#171C0E", borderColor: "#3A4227", borderWidth: 1, justifyContent: "center", overflow: "hidden" },
   fallbackBadge: { alignItems: "center", justifyContent: "center" },
-  badgeText: { color: "#FFFFFF", fontFamily: type.bold },
+  badgeText: { color: "white", fontFamily: type.bold },
   pill: { alignSelf: "flex-start", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   pillLabel: { fontFamily: type.semi, fontSize: 10, textTransform: "capitalize" },
   pillNeutral: { backgroundColor: "#2A3020" }, pillGreen: { backgroundColor: "#253722" }, pillAmber: { backgroundColor: "#463E20" }, pillRed: { backgroundColor: "#422326" },

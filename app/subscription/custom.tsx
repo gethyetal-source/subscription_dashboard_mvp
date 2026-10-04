@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useState } from "react";
 
@@ -14,7 +15,9 @@ const cadences: BillingCadence[] = ["weekly", "monthly", "quarterly", "yearly"];
 const sources: BillingSource[] = ["provider", "apple", "google", "carrier", "reseller", "unknown"];
 const autoRenewStatuses: AutoRenewStatus[] = ["on", "off", "unknown"];
 
+const baseStyles = () => styles;
 export default function CustomSubscriptionScreen() {
+  const styles = useThemedStyles(baseStyles());
   const { addSubscription } = useSubscriptions();
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");

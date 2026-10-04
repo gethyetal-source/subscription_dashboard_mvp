@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 
@@ -8,7 +9,9 @@ import { ScreenContainer } from "@/components/screen-container";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
+const baseStyles = () => styles;
 export default function ServiceDetailScreen() {
+  const styles = useThemedStyles(baseStyles());
   const { id } = useLocalSearchParams<{ id: string }>(); const service = getService(id);
   if (!service) return <ScreenContainer className="p-5"><Text style={styles.missing}>This service is not available in the catalog.</Text></ScreenContainer>;
   return <ScreenContainer className="px-5" containerClassName="bg-background"><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>

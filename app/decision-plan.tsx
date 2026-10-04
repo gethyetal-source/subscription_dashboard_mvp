@@ -1,4 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
+import { useMoneyFormatter } from "@/lib/privacy";
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -7,11 +9,14 @@ import { ScreenContainer } from "@/components/screen-container";
 import { getService } from "@/lib/catalog";
 import { useSubscriptions } from "@/lib/subscription-store";
 import type { RenewalDecisionAction, SubscriptionIntentTag, ValueBuyAgain, ValueUseLevel } from "@/lib/subscription-types";
-import { formatCurrency, formatDate } from "@/lib/subscription-utils";
+import { formatDate } from "@/lib/subscription-utils";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
+const baseStyles = () => styles;
 export default function DecisionPlanScreen() {
+  const styles = useThemedStyles(baseStyles());
+  const formatCurrency = useMoneyFormatter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { subscriptions, updateDecisionSupport } = useSubscriptions();
   const record = subscriptions.find((item) => item.id === id);

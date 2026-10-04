@@ -2,9 +2,10 @@ import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 
 import type { SubscriptionRecord } from "@/lib/subscription-types";
-import { daysUntil, getRenewalReminderCopy } from "@/lib/subscription-utils";
+import { getRenewalReminderCopy } from "@/lib/subscription-utils";
 import { getService } from "@/lib/catalog";
 import type { ReminderPermissionState } from "@/lib/reminder-utils";
+import { buildReminderPlans } from "@/lib/renewal-engine";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -57,45 +58,39 @@ export async function prepareNotifications() {
   return (await getReminderPermissionState()) === "granted";
 }
 
-export async function scheduleRenewalReminder(subscription: SubscriptionRecord, daysBefore: number) {
-  if (Platform.OS === "web" || !subscription.reminderEnabled || subscription.status === "cancelled") return undefined;
-  const hasPermission = await prepareNotifications();
-  if (!hasPermission) return undefined;
-  await ensureRenewalChannel();
-  
-  const triggerDate = new Date(`${subscription.renewalDate}T09:00:00`);
-  triggerDate.setDate(triggerDate.getDate() - daysBefore);
-  if (triggerDate.getTime() <= Date.now() || daysUntil(subscription.renewalDate) < 0) return undefined;
-
-  const service = getService(subscription.serviceId);
-  return Notifications.scheduleNotificationAsync({
-    content: {
-      title: `${service?.name ?? "Subscription"} renews soon`,
-      body: getRenewalReminderCopy(subscription),
-      data: { subscriptionId: subscription.id, url: `/subscription/${subscription.id}` },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: triggerDate,
-      channelId: "renewals",
-    },
-  });
-}
-
-/*
- * Kept as the local scheduling entry point for the subscription store. It no
- * longer opens the operating-system permission prompt; that prompt now occurs
- * only when the user explicitly asks for reminders in Settings.
- */
-export async function scheduleRenewalReminderLegacy(subscription: SubscriptionRecord, daysBefore: number) {
-  return scheduleRenewalReminder(subscription, daysBefore);
-}
-
 export async function cancelRenewalReminder(identifier?: string) {
   if (!identifier || Platform.OS === "web") return;
   try {
     await Notifications.cancelScheduledNotificationAsync(identifier);
   } catch {
     // The operating system may have already removed an expired reminder.
+  }
+}
+
+export async function cancelSubscriptionReminders(record: SubscriptionRecord) {
+  const identifiers = [...new Set([record.reminderIdentifier, ...(record.reminderIdentifiers ?? [])].filter((id): id is string => Boolean(id)))];
+  await Promise.all(identifiers.map(cancelRenewalReminder));
+}
+
+export async function scheduleSubscriptionReminders(record: SubscriptionRecord, daysBefore: number) {
+  if (Platform.OS === "web" || !(await prepareNotifications())) return [];
+  const plans = buildReminderPlans(record, daysBefore);
+  const identifiers: string[] = [];
+  try {
+    for (const plan of plans) {
+      identifiers.push(await Notifications.scheduleNotificationAsync({
+        content: {
+          title: plan.kind === "cancellation" ? "Check your cancellation outcome" : plan.kind === "trial" ? "Your trial may become paid" : `${getService(record.serviceId)?.name ?? record.planName} renews soon`,
+          body: plan.kind === "cancellation" ? "Review the provider confirmation and check for further charges. This reminder does not verify cancellation." : getRenewalReminderCopy(record),
+          data: { subscriptionId: record.id, kind: plan.kind, dueDate: plan.dueDate, url: `/subscription/${record.id}` },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: plan.fireAt, channelId: "renewals" },
+      }));
+    }
+    return identifiers;
+  } catch {
+    await Promise.all(identifiers.map(cancelRenewalReminder));
+    // Saving a subscription must remain possible when the OS refuses notifications.
+    return [];
   }
 }
