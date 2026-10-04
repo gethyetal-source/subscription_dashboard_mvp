@@ -1,7 +1,8 @@
 import { billingSourceMeta, getService } from "./catalog";
 import type { BillingCadence, BillingSource, ChargeRecognitionCase, ChargeRecognitionDraft, HouseholdMember, RenewalDecisionAction, ServiceCategory, SubscriptionRecord } from "./subscription-types";
+import { addBillingPeriod, billingOccurrences } from "./renewal-engine";
 
-const cadenceMonths: Record<BillingCadence, number> = { weekly: 0.23, monthly: 1, quarterly: 3, yearly: 12 };
+const cadenceMonths: Record<BillingCadence, number> = { weekly: 12 / 52, monthly: 1, quarterly: 3, yearly: 12 };
 
 export function monthlyAmount(amount: number, cadence: BillingCadence) {
   if (!Number.isFinite(amount) || amount < 0) return 0;
@@ -80,9 +81,9 @@ export function getHouseholdContributions(subscriptions: SubscriptionRecord[], m
 }
 
 export function startOfDay(date: Date) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
-export function daysUntil(dateValue: string, reference = new Date()) { return Math.ceil((startOfDay(new Date(`${dateValue}T00:00:00`)).getTime() - startOfDay(reference).getTime()) / 86_400_000); }
+export function daysUntil(dateValue: string, reference = new Date()) { return Math.round((Date.parse(`${dateValue}T00:00:00Z`) - Date.UTC(reference.getFullYear(), reference.getMonth(), reference.getDate())) / 86_400_000); }
 export function formatCurrency(amount: number, currency = "USD") { try { return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount); } catch { return `${currency} ${amount.toFixed(2)}`; } }
-export function formatDate(value: string) { const date = new Date(`${value}T00:00:00`); return Number.isNaN(date.getTime()) ? "Date not set" : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date); }
+export function formatDate(value: string) { const date = new Date(`${value.slice(0, 10)}T00:00:00`); return Number.isNaN(date.getTime()) ? "Date not set" : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date); }
 export function formatRelativeRenewal(value: string) { const delta = daysUntil(value); if (delta === 0) return "Renews today"; if (delta === 1) return "Renews tomorrow"; if (delta > 1) return `Renews in ${delta} days`; return `Renewal was ${Math.abs(delta)} days ago`; }
 
 export function getUpcomingSubscriptions(subscriptions: SubscriptionRecord[]) { return [...subscriptions].filter((item) => item.status !== "cancelled").sort((a, b) => new Date(`${a.renewalDate}T00:00:00`).getTime() - new Date(`${b.renewalDate}T00:00:00`).getTime()); }
@@ -497,7 +498,17 @@ export function getLocalEvidenceIndex(subscriptions: SubscriptionRecord[], charg
   return entries.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
 }
 
-function escapeIcs(value: string) { return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;"); }
+function escapeIcs(value: string) { return value.replace(/\\/g, "\\\\").replace(/\r\n?|\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;"); }
+function foldCalendarLine(line: string) {
+  let result = ""; let bytes = 0;
+  for (const character of line) {
+    const point = character.codePointAt(0)!;
+    const size = point < 128 ? 1 : point < 2048 ? 2 : point < 65536 ? 3 : 4;
+    if (bytes + size > 75) { result += "\r\n "; bytes = 1; }
+    result += character; bytes += size;
+  }
+  return result;
+}
 
 /** Creates a shareable iCalendar payload that contains only user-saved renewal context. */
 export function buildRenewalCalendarExport(subscriptions: SubscriptionRecord[], generatedAt = new Date()) {
@@ -505,14 +516,14 @@ export function buildRenewalCalendarExport(subscriptions: SubscriptionRecord[], 
   const events = subscriptions
     .filter((item) => item.status !== "cancelled")
     .sort((left, right) => left.renewalDate.localeCompare(right.renewalDate))
-    .map((item) => {
-      const end = new Date(`${item.renewalDate}T00:00:00`);
-      end.setDate(end.getDate() + 1);
+    .flatMap((item) => billingOccurrences(item, localDateKey(generatedAt), addBillingPeriod(localDateKey(generatedAt), "yearly"), 12).map((dueDate) => {
+      const end = new Date(`${dueDate}T12:00:00Z`);
+      end.setUTCDate(end.getUTCDate() + 1);
       const serviceName = getService(item.serviceId)?.name ?? item.planName;
       const expected = formatCurrency(item.expectedNextCharge ?? item.amount, item.currency);
       const description = [`Plan: ${item.planName}`, `Expected local charge: ${expected}`, `Billing cadence: ${item.cadence}`, `Billing source: ${item.billingSource}`, item.notes ? `Local note: ${item.notes}` : undefined, "Review the official provider management page before this renewal."].filter(Boolean).join("\n");
-      return ["BEGIN:VEVENT", `UID:subtrack-${escapeIcs(item.id)}@local`, `DTSTAMP:${stamp}Z`, `DTSTART;VALUE=DATE:${item.renewalDate.replace(/-/g, "")}`, `DTEND;VALUE=DATE:${end.toISOString().slice(0, 10).replace(/-/g, "")}`, `SUMMARY:${escapeIcs(`SubTrack renewal — ${serviceName}`)}`, `DESCRIPTION:${escapeIcs(description)}`, "END:VEVENT"].join("\r\n");
-    }).join("\r\n");
+      return ["BEGIN:VEVENT", `UID:subtrack-${escapeIcs(item.id)}-${dueDate}@local`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${dueDate.replace(/-/g, "")}`, `DTEND;VALUE=DATE:${end.toISOString().slice(0, 10).replace(/-/g, "")}`, `SUMMARY:${escapeIcs(`SubTrack renewal — ${serviceName}`)}`, `DESCRIPTION:${escapeIcs(description)}`, "END:VEVENT"].map(foldCalendarLine).join("\r\n");
+    })).join("\r\n");
   return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SubTrack//Renewals//EN", "CALSCALE:GREGORIAN", events, "END:VCALENDAR", ""].join("\r\n");
 }
 

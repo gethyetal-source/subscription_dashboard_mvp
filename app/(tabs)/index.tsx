@@ -6,7 +6,9 @@ import { EmptyState, ServiceBadge } from "@/components/subscription-ui";
 import { ScreenContainer } from "@/components/screen-container";
 import { getService } from "@/lib/catalog";
 import { useSubscriptions } from "@/lib/subscription-store";
-import { formatCurrency, formatCurrencySpendGroups, formatRelativeRenewal, getSpendSummary } from "@/lib/subscription-utils";
+import { formatRelativeRenewal, getSpendSummary } from "@/lib/subscription-utils";
+import { useMoneyFormatter } from "@/lib/privacy";
+import { Button } from "@/components/app-ui";
 import type { SubscriptionRecord } from "@/lib/subscription-types";
 import { useThemeContext } from "@/lib/theme-provider";
 
@@ -33,6 +35,7 @@ function CommandHeader({
   onReview: () => void;
   onAdd: () => void;
 }) {
+  const formatCurrency = useMoneyFormatter();
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
   const service = nextAction ? getService(nextAction.serviceId) : undefined;
   const actionTitle = nextAction?.status === "trial" ? "Your trial needs a decision" : "Your next charge is approaching";
@@ -62,6 +65,7 @@ function CommandHeader({
 }
 
 function ChargeStrip({ items, isDark }: { items: SubscriptionRecord[]; isDark: boolean }) {
+  const formatCurrency = useMoneyFormatter();
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
   return <View style={styles.runRateBlock}>
     <View style={styles.sectionHeadingRow}>
@@ -89,6 +93,7 @@ function ChargeStrip({ items, isDark }: { items: SubscriptionRecord[]; isDark: b
 }
 
 function SubscriptionLedgerRow({ item, isDark }: { item: SubscriptionRecord; isDark: boolean }) {
+  const formatCurrency = useMoneyFormatter();
   const styles = useMemo(() => makeStyles(isDark), [isDark]);
   const service = getService(item.serviceId);
   const urgency = item.status === "trial" ? styles.urgencyTrial : item.status === "uncertain" ? styles.urgencyMuted : styles.urgencyActive;
@@ -104,6 +109,8 @@ function SubscriptionLedgerRow({ item, isDark }: { item: SubscriptionRecord; isD
 }
 
 export default function HomeScreen() {
+  const formatCurrency = useMoneyFormatter();
+  const formatCurrencySpendGroups = (groups: { monthly: number; currency: string }[]) => groups.map((group) => formatCurrency(group.monthly, group.currency)).join(" · ");
   const { isReady, subscriptions, settings } = useSubscriptions();
   const { colorScheme } = useThemeContext();
   const isDark = colorScheme === "dark";
@@ -113,7 +120,7 @@ export default function HomeScreen() {
   const nextAction = activeSubscriptions.find((item) => item.status === "trial") ?? activeSubscriptions[0];
   const ledgerItems = activeSubscriptions.slice(0, 5);
   const chargeStripItems = activeSubscriptions.slice(0, 6);
-  const budgetDelta = settings.monthlyBudget && !spend.hasMixedCurrencies ? settings.monthlyBudget - spend.monthly : undefined;
+  const budgetDelta = settings.monthlyBudget && !spend.hasMixedCurrencies && (settings.budgetCurrency ?? "USD") === spend.currency ? settings.monthlyBudget - spend.monthly : undefined;
 
   if (!isReady) return <ScreenContainer><View style={styles.loading}><ActivityIndicator color={styles.loadingIndicator.color as string} /></View></ScreenContainer>;
 
@@ -125,7 +132,8 @@ export default function HomeScreen() {
       contentContainerStyle={styles.content}
       renderItem={({ item }) => <SubscriptionLedgerRow item={item} isDark={isDark} />}
       ListHeaderComponent={<>
-        <CommandHeader isDark={isDark} nextAction={nextAction} onReview={() => nextAction ? router.push(`/subscription/edit?subscriptionId=${nextAction.id}&serviceId=${nextAction.serviceId}` as never) : router.push("/(tabs)/discover")} onAdd={() => router.push("/(tabs)/discover")} />
+        <CommandHeader isDark={isDark} nextAction={nextAction} onReview={() => router.push("/renewals" as never)} onAdd={() => router.push("/quick-add" as never)} />
+        <View style={{ gap: 8, marginBottom: 16 }}><Button label="Renewal action center" secondary onPress={() => router.push("/renewals" as never)} /><Button label="Spending, value & savings" secondary onPress={() => router.push("/insights" as never)} /></View>
         <View style={styles.monthOverview}>
           <View><Text style={styles.overviewKicker}>{spend.hasMixedCurrencies ? "MONTHLY RUN RATE BY CURRENCY" : "MONTHLY RUN RATE"}</Text><Text style={styles.runRate}>{spend.hasMixedCurrencies ? formatCurrencySpendGroups(spend.currencyGroups) : formatCurrency(spend.monthly, spend.currency)}</Text></View>
           <View style={styles.annualBlock}><Text style={styles.annualLabel}>{spend.hasMixedCurrencies ? "Not converted" : "Annual cost"}</Text><Text style={styles.annualValue}>{spend.hasMixedCurrencies ? "Review per currency" : formatCurrency(spend.annual, spend.currency)}</Text></View>

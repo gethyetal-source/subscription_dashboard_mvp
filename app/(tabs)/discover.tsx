@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useMemo, useState } from "react";
 
@@ -10,7 +11,9 @@ import { useThemeContext } from "@/lib/theme-provider";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
+const baseStyles = () => ({ styles, revamp });
 export default function DiscoverScreen() {
+  const { styles, revamp } = useThemedStyles(baseStyles());
   const { colorScheme } = useThemeContext();
   const headingTheme = colorScheme === "dark" ? electric.dark : electric.light;
   const [query, setQuery] = useState("");

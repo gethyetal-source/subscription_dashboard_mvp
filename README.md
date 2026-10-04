@@ -15,7 +15,7 @@ SubTrack is a cross-platform Expo application for people who want a clear view o
 - [Quality checks](#quality-checks)
 - [Deploy the web version to Vercel](#deploy-the-web-version-to-vercel)
 - [Create an Android test build](#create-an-android-test-build)
-- [Future cloud sync](#future-cloud-sync)
+- [Optional cloud backup and households](#optional-cloud-backup-and-households)
 
 ## Key capabilities
 
@@ -27,6 +27,12 @@ SubTrack is a cross-platform Expo application for people who want a clear view o
 | **Fast management** | Quick-edit amount and renewal-date sheet, calendar date picker, required-field validation, and deletion controls restricted to the **Subscriptions** tab. |
 | **Provider handoff** | Open each provider’s official management page; SubTrack does not attempt provider-side cancellation. |
 | **Personalization** | Light/dark theme, Poppins typography, monthly budget, reminder lead time, and exported local data. |
+| **Renewal control** | Quick add, a renewal action queue, and multiple local reminders for renewals, trial endings, and cancellation follow-ups. |
+| **Backup and import** | Validated JSON backup and restore, automatic local recovery snapshots, CSV import, and on-device receipt recognition with review before saving. |
+| **Insights** | Per-currency cash-flow forecasts, budget position, price-change impact, value checks, and recorded savings. |
+| **Privacy and Android extras** | Hide amounts, Android app lock, and a next-renewal home-screen widget. |
+
+See [docs/subscription-control-features.md](docs/subscription-control-features.md) for details, limits, and deployment steps.
 
 ## Screenshots
 
@@ -111,11 +117,13 @@ Run these commands before committing a feature:
 ```sh
 pnpm test
 pnpm check
+pnpm lint
 ```
 
 | Command | Purpose |
 |---|---|
-| `pnpm test` | Runs the Vitest unit suite. |
+| `pnpm test` | Runs the offline Vitest suite, including Supabase migration security tests on in-process PostgreSQL. |
+| `pnpm test:integration` | Checks live Supabase connectivity; needs the public Supabase environment variables. |
 | `pnpm check` | Runs TypeScript without emitting output. |
 | `pnpm lint` | Runs Expo linting. |
 | `pnpm build:web` | Exports the deployable static web site to `dist/`. |
@@ -161,11 +169,9 @@ npx eas-cli@latest build --platform android --profile preview
 
 Use an installable `.apk` for direct tester installation and an `.aab` for Google Play submission [3].
 
-## Future cloud sync
+## Optional cloud backup and households
 
-The current MVP does not require authentication or a remote database. If cloud backup is added later, keep it opt-in and preserve local-only use without an account.
-
-**Suggested first cloud stack:** Supabase Auth + Postgres. Apply row-level security to every user-data table, store only a user’s own subscription records and preferences, and never ship service-role or database credentials in the mobile client. An alternative is Firebase Authentication + Firestore for teams that also plan to use Firebase Cloud Messaging.
+Cloud features are opt-in. Every local feature works without an account. To enable them, set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, apply the migrations in `supabase/migrations/`, and deploy the `delete-subtrack-account` Edge Function. All tables use row-level security, and the service-role key is never shipped in the app. See [docs/subscription-control-features.md](docs/subscription-control-features.md#supabase-deployment).
 
 ## Reference links
 

@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -12,10 +13,15 @@ const sections = [
   ["Sharing and disclosures", "SubTrack does not sell personal data or share it for advertising. When you use your device’s share sheet to export local data or a renewal calendar, you choose the recipient and service that receives that export."],
   ["Retention and deletion", "Local data remains until you delete it from SubTrack or uninstall the app, subject to your device’s backup settings. You can delete an optional cloud account and its remote backup from Profile or the public Account deletion page. Local records are not automatically removed when the cloud account is deleted."],
   ["Permissions", "SubTrack requests notification permission only after you choose to enable renewal reminders. Denying permission does not prevent core subscription tracking. The production release removes unrelated microphone access."],
+  ["Receipt and transaction import", "Images you choose are recognized on the Android device or inside a browser worker, not uploaded to a cloud OCR service. The web OCR engine may download its worker and English language model. Recognized text is temporary until you explicitly save reviewed fields. CSV files are read locally; only charges you confirm are saved."],
+  ["Backup and privacy controls", "The app retains five local pre-change recovery snapshots. These and JSON exports are not encrypted. Reset local data clears local recovery snapshots too. Optional Android app lock protects access to the screen, not the underlying storage. Hide amounts does not remove information from notes, editing fields, exports, or shared records."],
+  ["Household collaboration", "When cloud collaboration is deployed, only plan fields you explicitly publish are shared with household members. Private notes, billing identities, cancellation evidence, and device reminder identifiers are not published. The owner manages viewer/editor invitations. Deleting a cloud account also removes households it owns; other users' private device records remain unchanged."],
   ["Contact and final publication", "This in-app policy describes the current application behavior. Before public Play Store submission, the publisher must add its legal name and a monitored privacy contact to the hosted policy and matching Play Store listing."],
 ];
 
+const baseStyles = () => styles;
 export default function PrivacyPolicyScreen() {
+  const styles = useThemedStyles(baseStyles());
   return <ScreenContainer className="px-5" containerClassName="bg-background" edges={["top", "bottom", "left", "right"]}><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><View style={styles.nav}><Pressable accessibilityLabel="Go back" onPress={() => router.back()} hitSlop={10}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.navTitle}>Privacy policy</Text><View style={styles.spacer} /></View><Text style={styles.eyebrow}>SUBTRACK / PRIVACY</Text><Text style={styles.title}>Privacy policy</Text><Text style={styles.updated}>Last updated: 27 August 2026</Text><Text style={styles.intro}>This policy explains how SubTrack handles information. It is designed for a privacy-first, local-first subscription organizer.</Text>{sections.map(([heading, body]) => <View key={heading} style={styles.section}><Text style={styles.heading}>{heading}</Text><Text style={styles.body}>{body}</Text></View>)}<View style={styles.deleteCard}><Text style={styles.deleteTitle}>Need to delete an optional cloud account?</Text><Text style={styles.deleteBody}>Sign in to the account you want to remove, then confirm account deletion. The action removes the remote account and backup; it does not cancel third-party subscriptions.</Text><Pressable accessibilityRole="button" onPress={() => router.push("/delete-account" as never)} style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}><Text style={styles.deleteButtonText}>Open account deletion</Text></Pressable></View></ScrollView></ScreenContainer>;
 }
 

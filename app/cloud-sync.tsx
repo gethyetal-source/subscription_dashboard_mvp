@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -15,7 +16,9 @@ function formatTimestamp(value?: string) {
   return date.toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
+const baseStyles = () => styles;
 export default function CloudSyncScreen() {
+  const styles = useThemedStyles(baseStyles());
   const { isConfigured, isLoading, userEmail, profileName, needsProfileSetup, verificationPendingEmail, authCallbackMessage, lastSyncAt, signIn, signOut, signUp, resendVerification, clearVerificationPending, clearAuthCallbackMessage, requestPasswordReset, updateProfile, syncNow, getRestorePreview, restoreFromCloud } = useCloudSync();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -7,7 +8,9 @@ import { formatDate, getLocalEvidenceIndex } from "@/lib/subscription-utils";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
+const baseStyles = () => styles;
 export default function EvidenceIndexScreen() {
+  const styles = useThemedStyles(baseStyles());
   const { subscriptions, chargeRecognitionCases } = useSubscriptions();
   const evidence = getLocalEvidenceIndex(subscriptions, chargeRecognitionCases);
   return <ScreenContainer className="px-5" containerClassName="bg-background" edges={["top", "bottom", "left", "right"]}><FlatList data={evidence} keyExtractor={(item) => item.id} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} ListHeaderComponent={<View><View style={styles.nav}><Pressable accessibilityLabel="Go back" onPress={() => router.back()} hitSlop={10}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.navTitle}>Evidence index</Text><View style={styles.spacer} /></View><Text style={styles.title}>Your local references</Text><Text style={styles.subtitle}>A private index of billing labels, plan-change notes, cancellation references, and charge worksheets you entered yourself. No receipt, inbox, or account is scanned.</Text><View style={styles.count}><Text style={styles.countNumber}>{evidence.length}</Text><Text style={styles.countLabel}>saved local references</Text></View></View>} renderItem={({ item }) => <Pressable disabled={!item.subscriptionId} accessibilityRole={item.subscriptionId ? "button" : undefined} onPress={() => item.subscriptionId && router.push(`/subscription/${item.subscriptionId}` as never)} style={({ pressed }) => [styles.card, pressed && item.subscriptionId && styles.pressed]}><View style={styles.cardTop}><Text style={styles.kind}>{item.kind.replace(/-/g, " ")}</Text><Text style={styles.date}>{formatDate(item.date)}</Text></View><Text style={styles.itemTitle}>{item.title}</Text><Text style={styles.detail}>{item.detail}</Text>{item.subscriptionId ? <Text style={styles.open}>Open subscription ›</Text> : null}</Pressable>} ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyTitle}>No local references yet</Text><Text style={styles.emptyBody}>Add a billing clue, cancellation reference, price context, plan change, or charge-recognition worksheet to build your own private index.</Text></View>} /></ScreenContainer>;

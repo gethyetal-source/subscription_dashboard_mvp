@@ -88,6 +88,20 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    ["react-native-android-widget", {
+      widgets: [{
+        name: "SubTrackRenewals",
+        label: "SubTrack next renewal",
+        description: "Upcoming renewal with local privacy controls.",
+        minWidth: "250dp",
+        minHeight: "110dp",
+        targetCellWidth: 4,
+        targetCellHeight: 2,
+        resizeMode: "horizontal|vertical",
+        updatePeriodMillis: 1800000,
+      }],
+    }],
+    ["expo-image-picker", { photosPermission: "Choose a receipt or screenshot for on-device text recognition.", cameraPermission: false, microphonePermission: false }],
     [
       "expo-font",
       {

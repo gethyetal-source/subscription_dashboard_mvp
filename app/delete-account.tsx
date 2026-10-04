@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -7,7 +8,9 @@ import { useCloudSync } from "@/lib/cloud-sync";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
+const baseStyles = () => styles;
 export default function DeleteAccountScreen() {
+  const styles = useThemedStyles(baseStyles());
   const { isConfigured, isLoading, userEmail, deleteCloudAccount } = useCloudSync();
   const [deleting, setDeleting] = useState(false);
   const deleteAccount = () => Alert.alert("Delete cloud account?", "This permanently deletes the optional SubTrack cloud account and its remote backup. Your subscriptions stored only on this device remain unless you choose Reset local data separately.", [

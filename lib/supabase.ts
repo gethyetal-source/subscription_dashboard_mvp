@@ -4,7 +4,7 @@ import { Platform } from "react-native";
 
 const projectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-const isServerRender = typeof window === "undefined";
+const isServerRender = Platform.OS === "web" && typeof window === "undefined";
 const serverStorage = {
   getItem: async (_key: string) => null,
   setItem: async (_key: string, _value: string) => undefined,

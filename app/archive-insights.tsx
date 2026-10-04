@@ -1,14 +1,19 @@
 import { router } from "expo-router";
+import { useThemedStyles } from "@/lib/ui-theme";
+import { useMoneyFormatter } from "@/lib/privacy";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { useSubscriptions } from "@/lib/subscription-store";
-import { formatCurrency, formatDate, getArchivedSubscriptionInsights } from "@/lib/subscription-utils";
+import { formatDate, getArchivedSubscriptionInsights } from "@/lib/subscription-utils";
 import { getService } from "@/lib/catalog";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
+const baseStyles = () => styles;
 export default function ArchiveInsightsScreen() {
+  const styles = useThemedStyles(baseStyles());
+  const formatCurrency = useMoneyFormatter();
   const { subscriptions } = useSubscriptions();
   const archived = subscriptions.filter((item) => item.status === "cancelled").sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   const insight = getArchivedSubscriptionInsights(subscriptions);

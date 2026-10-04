@@ -143,6 +143,7 @@ export interface SubscriptionRecord {
   notes?: string;
   reminderEnabled: boolean;
   reminderIdentifier?: string;
+  reminderIdentifiers?: string[];
   /** Local household members who share this plan. The device owner is always included. */
   sharedMemberIds?: string[];
   /** Local percentage allocations for the assigned household members. Must total 100 when customized. */
@@ -156,6 +157,17 @@ export interface AppSettings {
   notificationsEnabled: boolean;
   dashboardSort: DashboardSort;
   monthlyBudget: number;
+  budgetCurrency?: string;
+  onboardingCompleted?: boolean;
+}
+
+export interface SavingsEntry {
+  id: string;
+  subscriptionId?: string;
+  amount: number;
+  currency: string;
+  occurredOn: string;
+  note: string;
 }
 
 /** A local worksheet entry for a charge the user cannot yet recognize. */

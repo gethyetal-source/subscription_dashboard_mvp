@@ -1,20 +1,25 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Session } from "@supabase/supabase-js";
 import * as Linking from "expo-linking";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import { Platform } from "react-native";
 
 import { getAuthCallbackMessage, getCloudAuthErrorMessage, getSessionTokensFromAuthUrl, normalizeCloudEmail } from "@/lib/cloud-sync-auth-utils";
-import { createCloudRestorePreview, isCloudSnapshot, prepareCloudSnapshot, type CloudRestorePreview } from "@/lib/cloud-sync-utils";
+import { createCloudRestorePreview, isCloudSnapshot, prepareCloudSnapshot, type CloudRestorePreview, type CloudSnapshot } from "@/lib/cloud-sync-utils";
 import { useSubscriptions } from "@/lib/subscription-store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const LAST_SYNC_KEY = "subtrack.cloud-sync.last-sync.v1";
 const PENDING_VERIFICATION_EMAIL_KEY = "subtrack.cloud-sync.pending-verification-email.v1";
-const WEB_AUTH_ORIGIN = "https://subtrackdash-k768wbpy.manus.space";
+const WEB_AUTH_ORIGIN = process.env.EXPO_PUBLIC_AUTH_REDIRECT_ORIGIN;
 
 function authRedirectUrl(path: "cloud-sync" | "password-reset") {
-  return Platform.OS === "web" ? `${WEB_AUTH_ORIGIN}/${path}` : Linking.createURL(path);
+  if (Platform.OS !== "web") return Linking.createURL(path);
+  const origin = WEB_AUTH_ORIGIN ?? (typeof window !== "undefined" ? window.location.origin : undefined);
+  if (!origin) throw new Error("Configure the public authentication redirect origin.");
+  const url = new URL(origin);
+  if (url.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(url.hostname)) throw new Error("Authentication redirects must use HTTPS.");
+  return `${url.origin}/${path}`;
 }
 
 function authError(error: unknown) {
@@ -62,13 +67,24 @@ function pendingEmailFromUser(user?: Session["user"] | null) {
 }
 
 export function CloudSyncProvider({ children }: PropsWithChildren) {
-  const { subscriptions, settings, householdMembers, replaceLocalSnapshot } = useSubscriptions();
+  const { subscriptions, settings, householdMembers, chargeRecognitionCases, catalogCorrectionRequests, savingsEntries, replaceLocalSnapshot } = useSubscriptions();
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured);
   const [lastSyncAt, setLastSyncAt] = useState<string | undefined>();
   const [verificationPendingEmail, setVerificationPendingEmail] = useState<string | undefined>();
   const [authCallbackMessage, setAuthCallbackMessage] = useState<string | undefined>();
   const [pendingEmailChange, setPendingEmailChange] = useState<string | undefined>();
+  const operationBusy = useRef(false);
+  const reviewedBackup = useRef<{ userId: string; revision: number; snapshot: CloudSnapshot } | null>(null);
+  const snapshotState = useMemo(() => ({ subscriptions, settings, householdMembers, chargeRecognitionCases, catalogCorrectionRequests, savingsEntries }), [subscriptions, settings, householdMembers, chargeRecognitionCases, catalogCorrectionRequests, savingsEntries]);
+
+  useEffect(() => {
+    let mounted = true;
+    reviewedBackup.current = null; setLastSyncAt(undefined);
+    if (session?.user.id) void AsyncStorage.getItem(`${LAST_SYNC_KEY}.${session.user.id}`)
+      .then((value) => { if (mounted) setLastSyncAt(value ?? undefined); }).catch(() => undefined);
+    return () => { mounted = false; };
+  }, [session?.user.id]);
 
   const clearVerificationPending = useCallback(async () => {
     setVerificationPendingEmail(undefined);
@@ -87,12 +103,11 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
 
     void Promise.all([
       client.auth.getSession(),
-      AsyncStorage.getItem(LAST_SYNC_KEY),
       AsyncStorage.getItem(PENDING_VERIFICATION_EMAIL_KEY),
-    ]).then(([sessionResult, storedLastSync, storedPendingEmail]) => {
+    ]).then(([sessionResult, storedPendingEmail]) => {
       if (!mounted) return;
       setSession(sessionResult.data.session);
-      setLastSyncAt(storedLastSync ?? undefined);
+      setLastSyncAt(undefined);
       setVerificationPendingEmail(sessionResult.data.session ? undefined : storedPendingEmail ?? undefined);
       setPendingEmailChange(pendingEmailFromUser(sessionResult.data.session?.user));
       setIsLoading(false);
@@ -247,47 +262,76 @@ export function CloudSyncProvider({ children }: PropsWithChildren) {
 
   const syncNow = useCallback(async () => {
     if (!supabase || !session?.user.id) throw new Error("Sign in before syncing your data.");
-    const snapshot = prepareCloudSnapshot({ subscriptions, settings, householdMembers });
-    const { error } = await supabase.from("subtrack_sync_state").upsert(
-      { user_id: session.user.id, payload: snapshot },
-      { onConflict: "user_id" },
-    );
-    if (error) throw asError(error);
-    setLastSyncAt(snapshot.syncedAt);
-    await AsyncStorage.setItem(LAST_SYNC_KEY, snapshot.syncedAt);
-  }, [householdMembers, session?.user.id, settings, subscriptions]);
+    if (operationBusy.current) throw new Error("A cloud operation is already in progress.");
+    operationBusy.current = true;
+    try {
+      const client = supabase;
+      const userId = session.user.id;
+      const key = `subtrack.cloud-revision.v1.${userId}`;
+      const snapshot = prepareCloudSnapshot(snapshotState);
+      const upload = (expected: number) => client.rpc("subtrack_save_snapshot", { p_payload: snapshot, p_expected_revision: expected });
+      const revision = Number(await AsyncStorage.getItem(key) ?? "0");
+      let { data, error } = await upload(revision);
+      if (error?.message.includes("SUBTRACK_SYNC_CONFLICT") && revision !== 0) {
+        // A cached revision with no cloud row (e.g. the backup was deleted) would otherwise block uploads forever.
+        const existing = await client.from("subtrack_sync_state").select("revision").eq("user_id", userId).maybeSingle();
+        if (!existing.error && !existing.data) {
+          await AsyncStorage.setItem(key, "0");
+          ({ data, error } = await upload(0));
+        }
+      }
+      if (error) {
+        if (error.message.includes("SUBTRACK_SYNC_CONFLICT")) throw new Error("Cloud data changed on another device. Export your local backup, then review and restore the latest cloud backup before uploading. Nothing was overwritten.");
+        throw asError(error);
+      }
+      const result = data?.[0];
+      if (!result || !Number.isSafeInteger(Number(result.revision)) || typeof result.updated_at !== "string") throw new Error("The server returned an invalid sync acknowledgement.");
+      await AsyncStorage.setItem(key, String(result.revision));
+      await AsyncStorage.setItem(`${LAST_SYNC_KEY}.${session.user.id}`, result.updated_at);
+      setLastSyncAt(result.updated_at);
+      reviewedBackup.current = null;
+    } finally { operationBusy.current = false; }
+  }, [snapshotState, session?.user.id]);
 
   const getRestorePreview = useCallback(async () => {
     if (!supabase || !session?.user.id) throw new Error("Sign in before reviewing a cloud backup.");
     const { data, error } = await supabase
       .from("subtrack_sync_state")
-      .select("payload, updated_at")
+      .select("payload, updated_at, revision")
       .eq("user_id", session.user.id)
       .maybeSingle();
     if (error) throw asError(error);
-    if (!data || !isCloudSnapshot(data.payload)) return null;
+    reviewedBackup.current = null;
+    if (!data) return null;
+    if (!isCloudSnapshot(data.payload) || !Number.isSafeInteger(Number(data.revision))) throw new Error("Cloud backup is invalid or unsupported. Your local records were not changed.");
     const snapshot = { ...data.payload, syncedAt: typeof data.updated_at === "string" ? data.updated_at : data.payload.syncedAt };
+    reviewedBackup.current = { userId: session.user.id, revision: Number(data.revision), snapshot };
     return createCloudRestorePreview(snapshot, { subscriptions, settings, householdMembers });
   }, [householdMembers, session?.user.id, settings, subscriptions]);
 
   const restoreFromCloud = useCallback(async () => {
     if (!supabase || !session?.user.id) throw new Error("Sign in before restoring your data.");
+    const reviewed = reviewedBackup.current;
+    if (!reviewed || reviewed.userId !== session.user.id) throw new Error("Review the cloud restore preview before replacing local data.");
+    if (operationBusy.current) throw new Error("A cloud operation is already in progress.");
+    operationBusy.current = true;
+    try {
     const { data, error } = await supabase
       .from("subtrack_sync_state")
-      .select("payload, updated_at")
+      .select("payload, updated_at, revision")
       .eq("user_id", session.user.id)
       .maybeSingle();
     if (error) throw asError(error);
-    if (!data || !isCloudSnapshot(data.payload)) return false;
-    await replaceLocalSnapshot({
-      subscriptions: data.payload.subscriptions,
-      settings: data.payload.settings,
-      householdMembers: data.payload.householdMembers,
-    });
+    if (!data || !isCloudSnapshot(data.payload)) throw new Error("The backup is no longer available or valid. Review it again.");
+    if (Number(data.revision) !== reviewed.revision) throw new Error("Cloud backup changed since you reviewed it. Review the new preview before restoring.");
+    await replaceLocalSnapshot(reviewed.snapshot);
     const restoredAt = typeof data.updated_at === "string" ? data.updated_at : data.payload.syncedAt;
     setLastSyncAt(restoredAt);
-    await AsyncStorage.setItem(LAST_SYNC_KEY, restoredAt);
+    await AsyncStorage.setItem(`${LAST_SYNC_KEY}.${session.user.id}`, restoredAt);
+    await AsyncStorage.setItem(`subtrack.cloud-revision.v1.${session.user.id}`, String(reviewed.revision));
+    reviewedBackup.current = null;
     return true;
+    } finally { operationBusy.current = false; }
   }, [replaceLocalSnapshot, session?.user.id]);
 
   const value = useMemo<CloudSyncValue>(() => ({

@@ -1,4 +1,5 @@
 import type { LocalSubscriptionSnapshot } from "./subscription-store";
+import { portableSnapshot, snapshotSchema } from "./data-safety";
 
 export type CloudSnapshot = LocalSubscriptionSnapshot & {
   schemaVersion: 1;
@@ -18,16 +19,14 @@ export function prepareCloudSnapshot(snapshot: LocalSubscriptionSnapshot): Cloud
   return {
     schemaVersion: 1,
     syncedAt: new Date().toISOString(),
-    settings: snapshot.settings,
-    householdMembers: snapshot.householdMembers,
-    subscriptions: snapshot.subscriptions.map(({ reminderIdentifier: _reminderIdentifier, ...record }) => record),
+    ...portableSnapshot(snapshot),
   };
 }
 
 export function isCloudSnapshot(value: unknown): value is CloudSnapshot {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<CloudSnapshot>;
-  return candidate.schemaVersion === 1 && Array.isArray(candidate.subscriptions) && Array.isArray(candidate.householdMembers) && Boolean(candidate.settings);
+  return candidate.schemaVersion === 1 && typeof candidate.syncedAt === "string" && Number.isFinite(Date.parse(candidate.syncedAt)) && snapshotSchema.safeParse(candidate).success;
 }
 
 export function createCloudRestorePreview(cloud: CloudSnapshot, local: LocalSubscriptionSnapshot): CloudRestorePreview {

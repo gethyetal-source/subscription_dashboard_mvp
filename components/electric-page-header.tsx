@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useThemedStyles } from "@/lib/ui-theme";
 
 const type = { regular: "Poppins-Regular", bold: "Poppins-Bold" };
 
+const baseStyles = () => styles;
 export function ElectricPageHeader({ title, subtitle, trailing }: { title: string; subtitle: string; trailing?: ReactNode }) {
+  const styles = useThemedStyles(baseStyles());
   return <View style={styles.header}><View style={styles.copy}><Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>{trailing ? <View style={styles.trailing}>{trailing}</View> : null}</View>;
 }
 

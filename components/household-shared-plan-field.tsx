@@ -2,8 +2,10 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import type { HouseholdMember } from "@/lib/subscription-types";
 import { getHouseholdAllocation } from "@/lib/subscription-utils";
+import { useThemedStyles } from "@/lib/ui-theme";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
+const baseStyles = () => styles;
 
 export function SharedPlanField({
   members,
@@ -20,6 +22,7 @@ export function SharedPlanField({
   onSharesChange: (shares: Record<string, number>) => void;
   onManageHousehold: () => void;
 }) {
+  const styles = useThemedStyles(baseStyles());
   const participantIds = Array.from(new Set(["owner", ...selectedMemberIds])).filter((id) => members.some((member) => member.id === id));
   const fallbackShares = getHouseholdAllocation(participantIds, sharedMemberShares);
   const shareFor = (memberId: string) => sharedMemberShares?.[memberId] ?? fallbackShares[memberId] ?? 0;
@@ -69,7 +72,7 @@ const styles = StyleSheet.create({
   member: { alignItems: "center", borderRadius: 10, flexDirection: "row", gap: 9, minHeight: 42, paddingHorizontal: 8 },
   memberSelected: { backgroundColor: "#E8F0FE" },
   avatar: { alignItems: "center", borderRadius: 11, height: 22, justifyContent: "center", width: 22 },
-  avatarText: { color: "#FFFFFF", fontFamily: type.bold, fontSize: 10 },
+  avatarText: { color: "white", fontFamily: type.bold, fontSize: 10 },
   memberName: { color: "#3C4043", flex: 1, fontFamily: type.semi, fontSize: 11 },
   memberNameSelected: { color: "#1967D2" },
   check: { alignItems: "center", borderColor: "#9AA0A6", borderRadius: 9, borderWidth: 1.5, height: 18, justifyContent: "center", width: 18 },

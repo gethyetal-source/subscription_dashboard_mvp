@@ -1,4 +1,6 @@
 import * as WebBrowser from "expo-web-browser";
+import { useThemedStyles } from "@/lib/ui-theme";
+import { useMoneyFormatter } from "@/lib/privacy";
 import { router, useLocalSearchParams } from "expo-router";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -7,11 +9,14 @@ import { ScreenContainer } from "@/components/screen-container";
 import { billingSourceMeta, getService } from "@/lib/catalog";
 import { useSubscriptions } from "@/lib/subscription-store";
 import type { SubscriptionStatus } from "@/lib/subscription-types";
-import { annualAmount, formatCurrency, formatDate, formatRelativeRenewal, getCancellationEvidenceTimeline, getPlanChangeHistory, getSubscriptionOwnership, getTrialToPaidCountdowns, monthlyAmount, resolveManagementUrl } from "@/lib/subscription-utils";
+import { annualAmount, formatDate, formatRelativeRenewal, getCancellationEvidenceTimeline, getPlanChangeHistory, getSubscriptionOwnership, getTrialToPaidCountdowns, monthlyAmount, resolveManagementUrl } from "@/lib/subscription-utils";
 
 const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
 
+const baseStyles = () => styles;
 export default function SubscriptionDetailScreen() {
+  const styles = useThemedStyles(baseStyles());
+  const formatCurrency = useMoneyFormatter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { subscriptions, householdMembers, updateStatus, beginCancellationFollowUp, confirmCancellation } = useSubscriptions();
   const record = subscriptions.find((item) => item.id === id);
