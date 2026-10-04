@@ -20,6 +20,40 @@ async function asUser(user: string | null, role = "authenticated") {
 async function scalar<T>(sql: string, parameters: unknown[] = []) {
   return Object.values((await database.query<Record<string, T>>(sql, parameters)).rows[0])[0];
 }
+describe("cloud migration upgrade of an earlier sync table", () => {
+  it("keeps existing backups and removes direct writes and TRUNCATE", async () => {
+    const legacy = new PGlite();
+    try {
+      await legacy.exec(`
+        create schema auth; create role anon; create role authenticated;
+        create table auth.users(id uuid primary key, email text, email_confirmed_at timestamptz);
+        create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+        grant usage on schema auth, public to anon, authenticated;
+        insert into auth.users values ('${owner}', 'owner@example.test', now());
+        create table public.subtrack_sync_state (user_id uuid primary key references auth.users(id) on delete cascade, payload jsonb not null default '{}'::jsonb,
+          created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+        alter table public.subtrack_sync_state enable row level security;
+        grant all on public.subtrack_sync_state to anon, authenticated;
+        create policy subtrack_insert_own on public.subtrack_sync_state for insert to authenticated with check ((select auth.uid()) = user_id);
+        create policy subtrack_update_own on public.subtrack_sync_state for update to authenticated using ((select auth.uid()) = user_id);
+        create policy subtrack_select_own on public.subtrack_sync_state for select to authenticated using ((select auth.uid()) = user_id);
+        insert into public.subtrack_sync_state(user_id, payload) values ('${owner}', '{"schemaVersion":1}');
+      `);
+      await legacy.exec(readFileSync(join(migrationsDirectory, "202610040001_subtrack_sync.sql"), "utf8"));
+      const policies = await legacy.query<{ policyname: string }>("select policyname from pg_policies where tablename='subtrack_sync_state' order by 1");
+      expect(policies.rows.map((row) => row.policyname)).toEqual(["subtrack_delete_own", "subtrack_read_own"]);
+      await legacy.exec("set role authenticated");
+      await legacy.query("select set_config('request.jwt.claim.sub', $1, false)", [owner]);
+      const existing = await legacy.query<{ revision: number }>("select revision from public.subtrack_sync_state");
+      expect(existing.rows.map((row) => Number(row.revision))).toEqual([1]);
+      await expect(legacy.query("update public.subtrack_sync_state set payload='{}'")).rejects.toThrow("permission denied");
+      await expect(legacy.query("truncate public.subtrack_sync_state")).rejects.toThrow("permission denied");
+      const saved = await legacy.query<{ revision: number }>("select * from public.subtrack_save_snapshot($1::jsonb, 1)", [JSON.stringify(payload)]);
+      expect(Number(saved.rows[0].revision)).toBe(2);
+    } finally { await legacy.close(); }
+  }, 30_000);
+});
+
 describe("cloud migration security (isolated PostgreSQL)", () => {
   beforeAll(async () => {
     database = new PGlite();
