@@ -9,9 +9,13 @@ create table if not exists public.subtrack_sync_state (
 alter table public.subtrack_sync_state add column if not exists revision bigint not null default 1;
 alter table public.subtrack_sync_state add column if not exists updated_at timestamptz not null default now();
 alter table public.subtrack_sync_state enable row level security;
-revoke all on public.subtrack_sync_state from anon;
-revoke insert, update on public.subtrack_sync_state from authenticated;
+-- Revoke everything first: default grants include TRUNCATE, which bypasses row-level security.
+revoke all on public.subtrack_sync_state from anon, authenticated;
 grant select, delete on public.subtrack_sync_state to authenticated;
+-- Writes go only through subtrack_save_snapshot; remove direct-write and superseded policies from earlier setups.
+drop policy if exists subtrack_insert_own on public.subtrack_sync_state;
+drop policy if exists subtrack_update_own on public.subtrack_sync_state;
+drop policy if exists subtrack_select_own on public.subtrack_sync_state;
 drop policy if exists subtrack_read_own on public.subtrack_sync_state;
 create policy subtrack_read_own on public.subtrack_sync_state for select to authenticated using (user_id = (select auth.uid()));
 drop policy if exists subtrack_delete_own on public.subtrack_sync_state;
