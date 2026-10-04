@@ -1,0 +1,75 @@
+diff --git a/.easignore b/.easignore
+new file mode 100644
+index 0000000..caddaf3
+--- /dev/null
++++ b/.easignore
+@@ -0,0 +1,40 @@
++# Keep the repository's ignored files out of the build upload.
++node_modules/
++.expo/
++dist/
++web-build/
++expo-env.d.ts
++.kotlin/
++*.orig.*
++*.jks
++*.p8
++*.p12
++*.key
++*.mobileprovision
++.metro-health-check*
++npm-debug.*
++yarn-debug.*
++yarn-error.*
++.DS_Store
++*.pem
++.env*
++*.tsbuildinfo
++app-example
++/ios
++/android
++.vscode/
++.idea/
++*.swp
++*.swo
++*~
++logs
++*.log
++Thumbs.db
++*.tgz
++*.tar.gz
++.cache/
++.webdev/
++.project-config.json
++
++# Use the project's pinned pnpm lockfile, not the stale npm lockfile.
++package-lock.json
+diff --git a/app.config.ts b/app.config.ts
+index fd54dec..9eb3a6f 100644
+--- a/app.config.ts
++++ b/app.config.ts
+@@ -131,6 +131,11 @@ const config: ExpoConfig = {
+     typedRoutes: true,
+     reactCompiler: true,
+   },
++  extra: {
++    eas: {
++      projectId: "156b1a07-2843-4a84-ba8d-4b3013578466",
++    },
++  },
+ };
+ 
+ export default config;
+diff --git a/eas.json b/eas.json
+index 3fafeab..ef52537 100644
+--- a/eas.json
++++ b/eas.json
+@@ -6,6 +6,8 @@
+   "build": {
+     "preview": {
+       "distribution": "internal",
++      "node": "22.22.0",
++      "pnpm": "9.12.0",
+       "android": {
+         "buildType": "apk"
+       }
