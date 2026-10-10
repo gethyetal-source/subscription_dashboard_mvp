@@ -1,102 +1,148 @@
 import { router } from "expo-router";
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
-import { useCallback, useEffect, useState } from "react";
+import { Platform, ScrollView, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ElectricPageHeader } from "@/components/electric-page-header";
+import { Button, ChoiceChips, ConfirmDialog, Copy, Field, Notice, ToggleRow } from "@/components/app-ui";
+import { BrandMark } from "@/components/brand-mark";
+import { CountryPickerSheet } from "@/components/country-picker-sheet";
+import { ActionSheet, Disclosure, FinanceHeader, FinanceLink, Surface, financeType } from "@/components/finance-ui";
 import { ScreenContainer } from "@/components/screen-container";
-import { useCloudSync } from "@/lib/cloud-sync";
-import { getReminderPermissionGuidance, type ReminderPermissionState } from "@/lib/reminder-utils";
-import { getReminderPermissionState, getScheduledRenewalReminderCount, requestReminderPermission } from "@/lib/reminders";
+import { useAccount } from "@/lib/account";
+import { countrySettingsPatch, defaultCurrency, getCountry, type Country } from "@/lib/countries";
+import { COUNTRY_DATA_LICENSE } from "@/lib/country-data-license";
+import { exportTextFile } from "@/lib/file-transfer";
+import { parseMoneyInput } from "@/lib/form-utils";
+import type { ReminderPermissionState } from "@/lib/reminder-utils";
+import { getReminderPermissionState, requestReminderPermission } from "@/lib/reminders";
 import { useSubscriptions } from "@/lib/subscription-store";
 import { buildRenewalCalendarExport } from "@/lib/subscription-utils";
 import { useThemeContext } from "@/lib/theme-provider";
-import { exportTextFile } from "@/lib/file-transfer";
 import { pinRenewalWidget } from "@/lib/widget-entry";
-import { useThemedStyles } from "@/lib/ui-theme";
+import { usePalette } from "@/lib/ui-theme";
+import { useMoneyFormatter } from "@/lib/privacy";
 
-const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
-
-const baseStyles = () => ({ styles, revamp });
 export default function SettingsScreen() {
-  const { styles, revamp } = useThemedStyles(baseStyles());
-  const { settings, subscriptions, updateSettings, resetLocalData } = useSubscriptions();
-  const { userEmail, profileName } = useCloudSync();
+  const store = useSubscriptions();
+  const account = useAccount();
   const { colorScheme, setColorScheme } = useThemeContext();
-  const sectionTheme = colorScheme === "dark" ? electric.dark : electric.light;
-  const [budgetInput, setBudgetInput] = useState(settings.monthlyBudget ? String(settings.monthlyBudget) : "");
-  const [reminderPermission, setReminderPermission] = useState<ReminderPermissionState | undefined>();
-  const [scheduledReminderCount, setScheduledReminderCount] = useState<number | undefined>();
-  const [reminderBusy, setReminderBusy] = useState(false);
+  const colors = usePalette();
+  const money = useMoneyFormatter();
+  const [budgetInput, setBudgetInput] = useState("");
+  const [currencyInput, setCurrencyInput] = useState("USD");
+  const [permission, setPermission] = useState<ReminderPermissionState>();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
+  const [resetVisible, setResetVisible] = useState(false);
+  const [budgetVisible, setBudgetVisible] = useState(false);
+  const [countryVisible, setCountryVisible] = useState(false);
+  const [countryLicenseVisible, setCountryLicenseVisible] = useState(false);
+  const [remindersVisible, setRemindersVisible] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const { monthlyBudget, budgetCurrency } = store.settings;
+  const country = getCountry(store.settings.countryCode);
 
-  useEffect(() => { setBudgetInput(settings.monthlyBudget ? String(settings.monthlyBudget) : ""); }, [settings.monthlyBudget]);
-  const refreshReminderTrust = useCallback(async () => {
-    const [permission, scheduledCount] = await Promise.all([getReminderPermissionState(), getScheduledRenewalReminderCount()]);
-    setReminderPermission(permission);
-    setScheduledReminderCount(scheduledCount);
-  }, []);
-  useEffect(() => { void refreshReminderTrust(); }, [refreshReminderTrust]);
+  useEffect(() => { setBudgetInput(monthlyBudget ? String(monthlyBudget) : ""); }, [monthlyBudget]);
+  useEffect(() => { setCurrencyInput(budgetCurrency ?? "USD"); }, [budgetCurrency]);
+  const refreshPermission = useCallback(async () => setPermission(await getReminderPermissionState()), []);
+  useEffect(() => { void refreshPermission().catch(() => setPermission("unsupported")); }, [refreshPermission]);
+  useEffect(() => { if (message) scrollRef.current?.scrollTo({ y: 0, animated: true }); }, [message]);
 
+  const run = async (operation: () => Promise<void>, success?: string) => {
+    if (busy) return;
+    setBusy(true); setMessage(""); setFailed(false);
+    try { await operation(); if (success) setMessage(success); }
+    catch { setFailed(true); setMessage("Could not save this change. Please try again."); }
+    finally { setBusy(false); }
+  };
   const saveBudget = () => {
-    const parsed = Number.parseFloat(budgetInput.replace(",", "."));
-    void updateSettings({ monthlyBudget: Number.isFinite(parsed) && parsed > 0 ? parsed : 0 });
+    const amount = budgetInput.trim() ? parseMoneyInput(budgetInput) : 0;
+    const currency = currencyInput.trim().toUpperCase();
+    if (amount === undefined || !/^[A-Z]{3}$/.test(currency)) {
+      setFailed(true); setMessage("Enter a valid amount and a three-letter currency, such as USD or INR."); return;
+    }
+    void run(async () => { await store.updateSettings({ monthlyBudget: amount, budgetCurrency: currency }); setBudgetVisible(false); }, "Budget saved.");
   };
-  const exportData = () => router.push("/backup" as never);
-  const exportCalendar = async () => {
-    try { await exportTextFile("subtrack-renewals.ics", buildRenewalCalendarExport(subscriptions), "text/calendar"); }
-    catch (error) { Alert.alert("Calendar export failed", error instanceof Error ? error.message : "Please try again."); }
-  };
-  const reset = () => Alert.alert("Reset local data?", "This removes all local subscription records, correction drafts, evidence indexes, and reminders. It does not cancel any provider subscription.", [{ text: "Cancel", style: "cancel" }, { text: "Reset", style: "destructive", onPress: () => void resetLocalData() }]);
-  const requestReminderAccess = async () => {
-    try {
-      setReminderBusy(true);
-      const permission = await requestReminderPermission();
-      setReminderPermission(permission);
-      if (permission === "granted") await updateSettings({ notificationsEnabled: true });
-      await refreshReminderTrust();
-    } finally { setReminderBusy(false); }
-  };
-  const toggleReminders = (enabled: boolean) => {
-    if (!enabled) { void updateSettings({ notificationsEnabled: false }).then(refreshReminderTrust); return; }
-    if (reminderPermission === "granted") { void updateSettings({ notificationsEnabled: true }).then(refreshReminderTrust); return; }
-    void requestReminderAccess();
-  };
-  const reminderCopy = reminderPermission ? getReminderPermissionGuidance(reminderPermission) : "Checking this device’s reminder permissions…";
-  const deliveryCopy = reminderPermission === "granted" && settings.notificationsEnabled ? scheduledReminderCount === undefined ? "Checking scheduled renewal reminders…" : `${scheduledReminderCount} renewal reminder${scheduledReminderCount === 1 ? " is" : "s are"} scheduled on this device.` : "No local reminder delivery is currently active.";
+  const changeCountry = (next: Country) => void run(async () => {
+    await store.updateSettings(countrySettingsPatch(store.settings, next.code));
+    setCountryVisible(false);
+  }, `Country changed to ${next.name}. New entries use ${next.currency}.${monthlyBudget > 0 && budgetCurrency !== next.currency ? ` Your ${budgetCurrency ?? "USD"} budget is unchanged.` : ""}`);
+  const toggleReminders = (enabled: boolean) => void run(async () => {
+    if (!enabled) { await store.updateSettings({ notificationsEnabled: false }); return; }
+    const nextPermission = await requestReminderPermission();
+    setPermission(nextPermission);
+    if (nextPermission === "granted") await store.updateSettings({ notificationsEnabled: true });
+    else setMessage("Allow notifications in your device settings to use reminders.");
+  });
 
-  return <ScreenContainer className="px-5" containerClassName="bg-background"><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><ElectricPageHeader title="Settings" subtitle="Privacy, renewal, and local-data preferences." />
-    <View style={[styles.privacy, revamp.privacy]}><View style={[styles.privacyMark, revamp.privacyMark]}><Text style={revamp.privacyMarkText}>✓</Text></View><View style={styles.flex}><Text style={[styles.privacyTitle, revamp.privacyTitle]}>Stored on this device</Text><Text style={[styles.privacyBody, revamp.privacyBody]}>SubTrack does not request your bank details, inbox, or service passwords.</Text></View></View>
-    <Section title="Your subscription toolkit" theme={sectionTheme}>
-      <ActionRow title="Renewal action center" body="Keep, review, or manage upcoming renewals." onPress={() => router.push("/renewals" as never)} /><Divider />
-      <ActionRow title="Quick add" body="Add a subscription with defaults and duplicate warnings." onPress={() => router.push("/quick-add" as never)} /><Divider />
-      <ActionRow title="Spending, value & savings" body="Forecast cash flow and record checked savings separately from estimates." onPress={() => router.push("/insights" as never)} /><Divider />
-      <ActionRow title="Private receipt & CSV import" body="Review on-device recognition and transaction files before saving." onPress={() => router.push("/import" as never)} /><Divider />
-      <ActionRow title="Regional plan comparison" body="Compare current quotes without currency conversion." onPress={() => router.push("/regional-plans" as never)} /><Divider />
-      <ActionRow title="Privacy controls" body="Hide amounts and configure Android app lock." onPress={() => router.push("/privacy-controls" as never)} />
-      {Platform.OS === "android" ? <><Divider /><ActionRow title="Add renewal home-screen widget" body="Your next renewal, with device privacy preferences respected." onPress={() => {
-        void pinRenewalWidget().then((accepted) => Alert.alert("Widget", accepted ? "Confirm the launcher prompt to add the widget." : "Long-press your home screen and choose Widgets → SubTrack."))
-          .catch(() => Alert.alert("Widget unavailable", "Install the rebuilt APK with widget support first."));
-      }} /></> : null}
-    </Section>
-    <Section title="Budget currency" theme={sectionTheme}><View style={styles.row}><Text style={styles.rowTitle}>Compare spending only in</Text><TextInput accessibilityLabel="Budget currency" defaultValue={settings.budgetCurrency ?? "USD"} autoCapitalize="characters" maxLength={3} style={styles.budgetInput} onEndEditing={({ nativeEvent }) => {
-      void updateSettings({ budgetCurrency: nativeEvent.text.toUpperCase() }).catch(() => Alert.alert("Invalid currency", "Use a three-letter currency code."));
-    }} /></View></Section>
-    <Section title="Appearance" theme={sectionTheme}><View style={styles.row}><View style={styles.rowCopy}><Text style={styles.rowTitle}>Dark theme</Text><Text style={styles.rowBody}>Use a darker interface in low-light environments.</Text></View><Switch value={colorScheme === "dark"} onValueChange={(value) => setColorScheme(value ? "dark" : "light")} trackColor={{ false: "#454D35", true: "#667D28" }} thumbColor={colorScheme === "dark" ? "#C9F72D" : "#F4F2E8"} /></View></Section>
-    <Section title="Monthly budget" theme={sectionTheme}><View style={styles.row}><View style={styles.rowCopy}><Text style={styles.rowTitle}>Subscription spending limit</Text><Text style={styles.rowBody}>Set a monthly target to compare against estimated recurring spend.</Text></View><View style={styles.budgetBox}><Text style={styles.budgetPrefix}>$</Text><TextInput value={budgetInput} onChangeText={setBudgetInput} onBlur={saveBudget} onSubmitEditing={saveBudget} keyboardType="decimal-pad" placeholder="0" placeholderTextColor="#80868B" returnKeyType="done" style={styles.budgetInput} /></View></View></Section>
-    <Section title="Reminders" theme={sectionTheme}><View style={styles.row}><View style={styles.rowCopy}><Text style={styles.rowTitle}>Renewal decision reminders</Text><Text style={styles.rowBody}>Local alerts include your saved trial, value-check, or decision context when available.</Text></View><Switch value={settings.notificationsEnabled && reminderPermission === "granted"} onValueChange={toggleReminders} trackColor={{ false: "#454D35", true: "#667D28" }} thumbColor={settings.notificationsEnabled && reminderPermission === "granted" ? "#C9F72D" : "#F4F2E8"} /></View><View style={styles.deliveryCard}><Text style={styles.deliveryTitle}>Reminder delivery</Text><Text style={styles.deliveryBody}>{reminderCopy}</Text><Text style={styles.deliveryStatus}>{deliveryCopy}</Text>{reminderPermission === "undetermined" ? <Pressable disabled={reminderBusy} accessibilityRole="button" onPress={() => void requestReminderAccess()} style={({ pressed }) => [styles.deliveryAction, (pressed || reminderBusy) && styles.pressed]}><Text style={styles.deliveryActionText}>{reminderBusy ? "Requesting access…" : "Allow renewal reminders"}</Text></Pressable> : null}</View><Divider /><View style={styles.row}><View style={styles.rowCopy}><Text style={styles.rowTitle}>Reminder lead time</Text><Text style={styles.rowBody}>Remind {settings.reminderDays} days before renewal.</Text></View><View style={styles.stepper}>{[1, 3, 7, 14, 30].map((days) => <Pressable key={days} accessibilityRole="button" accessibilityLabel={`Remind ${days} days before renewal`} onPress={() => void updateSettings({ reminderDays: days }).then(refreshReminderTrust)} style={({ pressed }) => [styles.step, days === settings.reminderDays && styles.stepSelected, pressed && styles.pressed]}><Text style={[styles.stepText, days === settings.reminderDays && styles.stepTextSelected]}>{days}d</Text></Pressable>)}</View></View></Section>
-    <Section title="Household" theme={sectionTheme}><ActionRow title="Local shared plans" body="See who uses a plan and each person’s local cost allocation." onPress={() => router.push("/household" as never)} /><Divider /><ActionRow title="Household collaboration" body="Optional cloud invitations and shared editing. Requires deployed collaboration migrations." onPress={() => router.push("/shared-household" as never)} /></Section>
-    <Section title="Cloud sync" theme={sectionTheme}><ActionRow title={userEmail ? "Profile & cloud account" : "Log in to cloud sync"} body={userEmail ? `${profileName ? `${profileName} · ` : ""}${userEmail} is ready to manage profile details and manual sync.` : "Create or sign in to an optional account to back up subscriptions and your household roster."} onPress={() => router.push(userEmail ? "/(tabs)/profile" as never : "/cloud-sync" as never)} /></Section>
-    <Section title="Subscription control" theme={sectionTheme}><ActionRow title="Control center" body="Review local renewal risks, category overlaps, billing clues, and cancellation follow-up." onPress={() => router.push("/control-center" as never)} /><Divider /><ActionRow title="Recognize an unknown charge" body="Work through your own charge label and billing clues without bank or inbox access." onPress={() => router.push("/charge-recognition" as never)} /></Section>
-    <Section title="Review & history" theme={sectionTheme}><ActionRow title="Catalog price updates" body="Review India source findings, regional cautions, and local correction drafts." onPress={() => router.push("/catalog-updates" as never)} /><Divider /><ActionRow title="Evidence index" body="Find your local billing clues, plan changes, and cancellation references." onPress={() => router.push("/evidence-index" as never)} /><Divider /><ActionRow title="Archived subscription insights" body="See locally marked cancellations and estimated savings by currency." onPress={() => router.push("/archive-insights" as never)} /></Section>
-    <Section title="About SubTrack" theme={sectionTheme}><ActionRow title="Privacy policy" body="Read how local data, optional cloud sync, and account deletion work." onPress={() => router.push("/privacy-policy" as never)} /><Divider /><ActionRow title="Membership possibilities" body="See potential ways to support SubTrack without selling personal data." onPress={() => router.push("/monetization" as never)} /></Section>
-    <Section title="Your data" theme={sectionTheme}><ActionRow title="Export local data" body="Share a JSON backup of your saved records." onPress={exportData} /><Divider /><ActionRow title="Export renewal calendar" body="Share active renewals with expected charge, billing source, and local notes." onPress={() => void exportCalendar()} /><Divider /><ActionRow title="Report catalog information" body="Keep a local correction draft with an official source link." onPress={() => router.push("/catalog-correction" as never)} /><Divider /><ActionRow danger title="Reset local data" body="Remove records stored on this device." onPress={reset} /></Section>
-    <View style={styles.footer}><Text style={styles.footerText}>SubTrack guides you to official management pages. It does not access, change, or cancel a provider account.</Text><Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/discover")} style={({ pressed }) => pressed && styles.pressed}><Text style={styles.footerLink}>Browse services</Text></Pressable></View>
-  </ScrollView></ScreenContainer>;
+  return <ScreenContainer edges={["top", "bottom", "left", "right"]}>
+    <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 22, gap: 24, paddingBottom: 32 }}>
+      <FinanceHeader title="Settings" back />
+      {message ? <Notice error={failed}>{message}</Notice> : null}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+        <BrandMark size={50} />
+        <View style={{ flex: 1 }}><Text style={{ color: colors.foreground, fontFamily: financeType.semi, fontSize: 17 }}>Make room for what matters.</Text><Text style={{ color: colors.muted, fontFamily: financeType.regular, fontSize: 11, marginTop: 3 }}>Your money. Your preferences.</Text></View>
+      </View>
+      <Surface>
+        <FinanceLink icon="person-circle-outline" title="Your account" detail={account.userEmail ?? "Google or email sign-in"} onPress={() => router.push("/(tabs)/profile")} />
+      </Surface>
+      <Surface>
+        <FinanceLink icon="globe-outline" title="Country & currency" detail={country ? `${country.name} · ${country.currency}` : `Choose your country · current default ${defaultCurrency(store.settings)}`} disabled={busy || !store.isReady} onPress={() => { setMessage(""); setCountryVisible(true); }} />
+        <FinanceLink icon="wallet-outline" title="Monthly budget" detail={monthlyBudget ? `${money(monthlyBudget, budgetCurrency)} · ${budgetCurrency}` : "No limit set"} onPress={() => { setMessage(""); setBudgetVisible(true); }} />
+        <ToggleRow label="Dark theme" value={colorScheme === "dark"} onChange={(value) => setColorScheme(value ? "dark" : "light")} />
+      </Surface>
+      {Platform.OS !== "web" ? <Surface>
+        <ToggleRow label="Renewal reminders" value={store.settings.notificationsEnabled && permission === "granted"} disabled={busy || !permission || permission === "unsupported"} onChange={toggleReminders} />
+        {permission === "denied" ? <Copy muted>Allow notifications in your device settings.</Copy> : permission === "unsupported" ? <Copy muted>Reminders aren’t available on this device.</Copy> : null}
+        <FinanceLink icon="time-outline" title="Reminder timing" detail={`${store.settings.reminderDays} days before renewal`} onPress={() => setRemindersVisible(true)} />
+      </Surface> : null}
+      <View style={{ gap: 10 }}>
+        <Text style={{ color: colors.muted, fontFamily: financeType.medium, fontSize: 11 }}>PRIVACY & DATA</Text>
+        <Surface>
+        <FinanceLink icon="shield-outline" title="Privacy controls" detail="Hide amounts and protect access" onPress={() => router.push("/privacy-controls")} />
+        <FinanceLink icon="download-outline" title="Backup & restore" detail="Local files only. Nothing is uploaded." onPress={() => router.push("/backup")} />
+        <FinanceLink icon="calendar-outline" title="Export renewal calendar" onPress={() => void run(() => exportTextFile("subtrack-renewals.ics", buildRenewalCalendarExport(store.subscriptions), "text/calendar"), "Calendar exported.")} />
+        {Platform.OS === "android" ? <FinanceLink icon="phone-portrait-outline" title="Add home-screen widget" onPress={() => void run(async () => {
+          const accepted = await pinRenewalWidget();
+          setMessage(accepted ? "Confirm the prompt to add your widget." : "Long-press your home screen, then choose Widgets and SubTrack.");
+        })} /> : null}
+        </Surface>
+      </View>
+      <View style={{ gap: 10 }}>
+        <Text style={{ color: colors.muted, fontFamily: financeType.medium, fontSize: 11 }}>HOUSEHOLD</Text>
+        <Surface>
+          <FinanceLink icon="people-outline" title="Shared plans" detail="Split costs on this device only" onPress={() => router.push("/household")} />
+        </Surface>
+      </View>
+      <View>
+        <Disclosure title="About SubTrack" open={aboutOpen} onToggle={() => setAboutOpen(!aboutOpen)}>
+          <FinanceLink icon="information-circle-outline" title="Privacy policy" onPress={() => router.push("/privacy-policy")} />
+          <FinanceLink icon="pricetags-outline" title="Catalog updates" onPress={() => router.push("/catalog-updates")} />
+          <FinanceLink icon="create-outline" title="Suggest a catalog correction" onPress={() => router.push("/catalog-correction")} />
+          <FinanceLink icon="sparkles-outline" title="Setup guide" onPress={() => router.push("/onboarding")} />
+          <FinanceLink icon="document-text-outline" title="Country data license" onPress={() => setCountryLicenseVisible(true)} />
+        </Disclosure>
+        <FinanceLink icon="trash-outline" title="Reset local data" danger onPress={() => setResetVisible(true)} />
+      </View>
+    </ScrollView>
+    <CountryPickerSheet visible={countryVisible} countryCode={store.settings.countryCode} busy={busy || !store.isReady} error={failed ? message : undefined} onSelect={changeCountry} onClose={() => { if (!busy) setCountryVisible(false); }} />
+    <ActionSheet visible={countryLicenseVisible} title="Country data license" onClose={() => setCountryLicenseVisible(false)}>
+      <Copy muted>Country and currency defaults use Unicode CLDR data.</Copy>
+      <Copy>{COUNTRY_DATA_LICENSE}</Copy>
+    </ActionSheet>
+    <ActionSheet visible={budgetVisible} title="Monthly budget" onClose={() => { if (!busy) setBudgetVisible(false); }}>
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ flex: 2, minWidth: 0 }}><Field label="Budget amount" value={budgetInput} onChangeText={setBudgetInput} keyboardType="decimal-pad" placeholder="No limit" editable={!busy} /></View>
+        <View style={{ flex: 1, minWidth: 0 }}><Field label="Currency" value={currencyInput} onChangeText={setCurrencyInput} autoCapitalize="characters" maxLength={3} editable={!busy} /></View>
+      </View>
+      <Copy muted>Only subscriptions in this currency count toward the limit. Leave the amount blank to remove it.</Copy>
+      {message && failed ? <Notice error>{message}</Notice> : null}
+      <Button label={busy ? "Saving…" : "Save budget"} disabled={busy || !store.isReady} onPress={saveBudget} />
+    </ActionSheet>
+    <ActionSheet visible={remindersVisible} title="Reminder timing" onClose={() => setRemindersVisible(false)}>
+      <ChoiceChips label="Remind me before renewal" value={store.settings.reminderDays} options={[1, 3, 7, 14, 30].map((days) => ({ value: days, label: `${days} day${days === 1 ? "" : "s"}` }))} disabled={busy} onChange={(reminderDays) => void run(async () => { await store.updateSettings({ reminderDays }); setRemindersVisible(false); })} />
+    </ActionSheet>
+    <ConfirmDialog visible={resetVisible} title="Reset local data?" message="This removes this account’s subscriptions, records, and recovery snapshots from this device. It does not cancel subscriptions, delete your sign-in, or change another account’s local records." confirmLabel="Reset local data" danger busy={busy} onCancel={() => setResetVisible(false)} onConfirm={() => void run(async () => { await store.resetLocalData(); setResetVisible(false); }, "Local data reset.")} />
+  </ScreenContainer>;
 }
-
-function Section({ title, theme, children }: { title: string; theme: { section: { color: string } }; children: React.ReactNode }) { const { styles } = useThemedStyles(baseStyles()); return <><Text style={[styles.section, theme.section]}>{title}</Text><View style={styles.group}>{children}</View></>; }
-function Divider() { const { styles } = useThemedStyles(baseStyles()); return <View style={styles.divider} />; }
-function ActionRow({ title, body, onPress, danger = false }: { title: string; body: string; onPress: () => void; danger?: boolean }) { const { styles } = useThemedStyles(baseStyles()); return <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={({ pressed }) => [styles.actionRow, pressed && styles.pressed]}><View style={styles.rowCopy}><Text style={danger ? styles.deleteTitle : styles.rowTitle}>{title}</Text><Text style={styles.rowBody}>{body}</Text></View><Text style={danger ? styles.deleteChevron : styles.chevron}>›</Text></Pressable>; }
-
-const styles = StyleSheet.create({ content: { paddingBottom: 32, paddingTop: 16 }, flex: { flex: 1 }, privacy: { alignItems: "flex-start", backgroundColor: "#202713", borderRadius: 14, flexDirection: "row", gap: 11, marginTop: 20, padding: 15 }, privacyMark: { alignItems: "center", backgroundColor: "#C9F72D", borderRadius: 12, height: 24, justifyContent: "center", width: 24 }, privacyTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 13 }, privacyBody: { color: "#A8AD98", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 3 }, section: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 16, marginBottom: 9, marginTop: 24 }, group: { backgroundColor: "#191E0F", borderColor: "#343A25", borderRadius: 14, borderWidth: 1, overflow: "hidden" }, row: { alignItems: "center", flexDirection: "row", gap: 10, minHeight: 74, padding: 15 }, rowCopy: { flex: 1 }, rowTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 13 }, rowBody: { color: "#A8AD98", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 3 }, deliveryCard: { backgroundColor: "#202713", borderColor: "#485632", borderRadius: 11, borderWidth: 1, marginHorizontal: 15, marginBottom: 14, padding: 12 }, deliveryTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 12 }, deliveryBody: { color: "#C9D0B8", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 4 }, deliveryStatus: { color: "#C9F72D", fontFamily: type.semi, fontSize: 10, lineHeight: 15, marginTop: 7 }, deliveryAction: { alignSelf: "flex-start", justifyContent: "center", marginTop: 8, minHeight: 32 }, deliveryActionText: { color: "#C9F72D", fontFamily: type.semi, fontSize: 11 }, budgetBox: { alignItems: "center", backgroundColor: "#12160B", borderColor: "#3A4227", borderRadius: 10, borderWidth: 1, flexDirection: "row", paddingHorizontal: 9, width: 78 }, budgetPrefix: { color: "#A8AD98", fontFamily: type.semi, fontSize: 13 }, budgetInput: { color: "#F4F2E8", flex: 1, fontFamily: type.semi, fontSize: 13, height: 36, minWidth: 0, paddingLeft: 3 }, divider: { backgroundColor: "#343A25", height: 1, marginLeft: 15 }, stepper: { backgroundColor: "#12160B", borderColor: "#343A25", borderRadius: 10, borderWidth: 1, flexDirection: "row", padding: 3 }, step: { borderRadius: 8, paddingHorizontal: 7, paddingVertical: 6 }, stepSelected: { backgroundColor: "#C9F72D" }, stepText: { color: "#A8AD98", fontFamily: type.semi, fontSize: 10 }, stepTextSelected: { color: "#172108" }, actionRow: { alignItems: "center", flexDirection: "row", gap: 10, justifyContent: "space-between", minHeight: 75, padding: 15 }, chevron: { color: "#C9F72D", fontFamily: type.regular, fontSize: 25 }, deleteTitle: { color: "#FF9B8C", fontFamily: type.semi, fontSize: 13 }, deleteChevron: { color: "#FF9B8C", fontFamily: type.regular, fontSize: 25 }, footer: { alignItems: "center", paddingHorizontal: 20, paddingTop: 24 }, footerText: { color: "#89917A", fontFamily: type.regular, fontSize: 10, lineHeight: 15, textAlign: "center" }, footerLink: { color: "#C9F72D", fontFamily: type.semi, fontSize: 12, marginTop: 11 }, pressed: { opacity: 0.75 } });
-const electric = { light: StyleSheet.create({ section: { color: "#293015" } }), dark: StyleSheet.create({ section: { color: "#F4F2E8" } }) };
-const revamp = StyleSheet.create({ privacy: { borderColor: "#485632", borderWidth: 1 }, privacyMark: { backgroundColor: "#C9F72D" }, privacyMarkText: { color: "#172108", fontFamily: type.bold, fontSize: 12 }, privacyTitle: { color: "#F4F2E8" }, privacyBody: { color: "#A8AD98" } });

@@ -8,6 +8,7 @@ import { useSubscriptions } from "@/lib/subscription-store";
 export default function BackupScreen() {
   const store = useSubscriptions();
   const [input, setInput] = useState("");
+  const [pasteVisible, setPasteVisible] = useState(false);
   const [preview, setPreview] = useState<ValidatedSnapshot>();
   const [backups, setBackups] = useState<LocalBackup[]>([]);
   const [busy, setBusy] = useState(false);
@@ -32,20 +33,23 @@ export default function BackupScreen() {
         const text = await chooseTextFile(["application/json", "text/plain"]);
         if (text !== null) { setInput(text); inspect(text); }
       })} />
-      <Field label="Or paste backup JSON" value={input} onChangeText={(text) => { setInput(text); setPreview(undefined); }} multiline maxLength={10_000_000} style={{ maxHeight: 180 }} />
-      <Button label="Review pasted backup" secondary disabled={busy || !input.trim()} onPress={() => void run(async () => inspect(input))} />
+      <Button label={pasteVisible ? "Hide backup text" : "Paste backup text instead"} secondary disabled={busy} onPress={() => setPasteVisible(!pasteVisible)} />
+      {pasteVisible ? <>
+        <Field label="Backup text" value={input} onChangeText={(text) => { setInput(text); setPreview(undefined); }} multiline maxLength={10_000_000} style={{ maxHeight: 180 }} />
+        <Button label="Review pasted backup" secondary disabled={busy || !input.trim()} onPress={() => void run(async () => inspect(input))} />
+      </> : null}
     </Card>
     {preview ? <Card title="Confirm replacement">
       <Copy>{preview.subscriptions.length} subscriptions and {preview.householdMembers.length} household members will replace {store.subscriptions.length} subscriptions on this device.</Copy>
-      <Copy muted>This does not cancel provider accounts. Device reminder IDs are removed and reminders are recreated.</Copy>
+      <Copy muted>Your reminders will be set up again. Provider accounts are not affected.</Copy>
       <Button label="Replace local data with reviewed backup" disabled={busy} onPress={() => void run(async () => {
         await store.replaceLocalSnapshot(preview); setPreview(undefined); setInput("");
         setBackups(await store.getLocalBackups()); setMessage("Backup restored.");
       })} />
       <Button label="Cancel restore" secondary onPress={() => setPreview(undefined)} />
     </Card> : null}
-    <Card title="Automatic local recovery snapshots">
-      <Copy muted>The last five pre-change snapshots are kept on this device. They are not off-device backups.</Copy>
+    <Card title="Recent device backups">
+      <Copy muted>Up to five previous copies are kept on this device. Export a file for a separate backup.</Copy>
       {backups.length ? backups.map((backup, index) => <Button key={`${backup.exportedAt}-${index}`} secondary
         label={`Review ${backup.data.subscriptions.length} records · ${new Date(backup.exportedAt).toLocaleString()}`}
         onPress={() => { setPreview(backup.data); setMessage(""); }} />) : <Copy>No recovery snapshots yet.</Copy>}

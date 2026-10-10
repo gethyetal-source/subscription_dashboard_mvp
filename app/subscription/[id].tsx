@@ -1,54 +1,140 @@
+import { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
-import { useThemedStyles } from "@/lib/ui-theme";
-import { useMoneyFormatter } from "@/lib/privacy";
 import { router, useLocalSearchParams } from "expo-router";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-
-import { Pill, PrimaryButton, SecondaryButton, ServiceBadge } from "@/components/subscription-ui";
-import { ScreenContainer } from "@/components/screen-container";
+import { Platform, Text, View } from "react-native";
+import { Button, ConfirmDialog, Copy, Notice, ToggleRow } from "@/components/app-ui";
+import { Disclosure, FinanceLink, FinancePage, MetricLabel, RoundAction, RowDivider, SectionHeading, Surface, financeType } from "@/components/finance-ui";
+import { ServiceBadge } from "@/components/subscription-ui";
 import { billingSourceMeta, getService } from "@/lib/catalog";
+import { deadlineLabel, shortDate, subscriptionName } from "@/lib/finance-overview";
+import { useMoneyFormatter } from "@/lib/privacy";
+import { getRenewalQueue } from "@/lib/renewal-queue";
 import { useSubscriptions } from "@/lib/subscription-store";
-import type { SubscriptionStatus } from "@/lib/subscription-types";
-import { annualAmount, formatDate, formatRelativeRenewal, getCancellationEvidenceTimeline, getPlanChangeHistory, getSubscriptionOwnership, getTrialToPaidCountdowns, monthlyAmount, resolveManagementUrl } from "@/lib/subscription-utils";
+import { annualAmount, formatDate, getCancellationEvidenceTimeline, getPlanChangeHistory, getSubscriptionOwnership, monthlyAmount, resolveManagementUrl } from "@/lib/subscription-utils";
+import { usePalette } from "@/lib/ui-theme";
 
-const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
+const decisionCopy = { keep: "Keep this plan", downgrade: "Look for a lower-cost plan", pause: "Pause if available", "cancel-officially": "Cancel with the provider", "review-later": "Review later" };
+const cadenceCopy = { weekly: "per week", monthly: "per month", quarterly: "per quarter", yearly: "per year" };
 
-const baseStyles = () => styles;
 export default function SubscriptionDetailScreen() {
-  const styles = useThemedStyles(baseStyles());
-  const formatCurrency = useMoneyFormatter();
+  const colors = usePalette();
+  const money = useMoneyFormatter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { subscriptions, householdMembers, updateStatus, beginCancellationFollowUp, confirmCancellation } = useSubscriptions();
-  const record = subscriptions.find((item) => item.id === id);
-  if (!record) return <ScreenContainer className="p-5"><Text style={styles.missing}>This subscription record no longer exists.</Text><Pressable accessibilityRole="button" onPress={() => router.replace("/(tabs)/subscriptions")}><Text style={styles.link}>Back to subscriptions</Text></Pressable></ScreenContainer>;
-
+  const store = useSubscriptions();
+  const record = store.subscriptions.find((item) => item.id === id);
+  const [dialog, setDialog] = useState<"manage" | "follow-up" | "confirm" | null>(null);
+  const [billingOpen, setBillingOpen] = useState(false);
+  const [sharingOpen, setSharingOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  if (!store.isReady) return <FinancePage title="Subscription"><Copy muted>Loading your subscription…</Copy></FinancePage>;
+  if (!record) return <FinancePage title="Subscription not found"><Copy muted>This record is no longer on this device.</Copy><Button label="View subscriptions" onPress={() => router.replace("/(tabs)/subscriptions")} /></FinancePage>;
   const service = getService(record.serviceId);
   const billing = billingSourceMeta[record.billingSource];
-  const tone = record.status === "trial" ? "amber" : record.status === "cancelled" ? "coral" : record.status === "uncertain" ? "neutral" : "teal";
-  const ownership = getSubscriptionOwnership(record, householdMembers);
-  const ownerShare = ownership.find((item) => item.member.id === "owner");
-  const isShared = ownership.length > 1;
-  const planChanges = getPlanChangeHistory(record);
-  const trialCountdown = getTrialToPaidCountdowns([record])[0];
+  const shares = getSubscriptionOwnership(record, store.householdMembers);
+  const changes = getPlanChangeHistory(record);
   const cancellationEvents = getCancellationEvidenceTimeline(record);
+  const next = getRenewalQueue([record]).find((item) => item.kind !== "cancellation");
+  const pending = record.cancellationState === "pending";
+  const archived = record.status === "cancelled";
+  const edit = (section?: string) => router.push({ pathname: "/subscription/edit", params: { subscriptionId: record.id, ...(section ? { section } : {}) } });
+  const review = () => router.push({ pathname: "/decision-plan", params: { id: record.id } });
+  const run = async (operation: () => Promise<unknown>) => {
+    if (busy) return;
+    setBusy(true); setError("");
+    try { await operation(); setDialog(null); }
+    catch { setDialog(null); setError("Could not complete that step. Please try again."); }
+    finally { setBusy(false); }
+  };
+  const changeReminder = (enabled: boolean) => {
+    const { id, createdAt: _created, updatedAt: _updated, reminderIdentifier: _reminder, reminderIdentifiers: _reminders, ...draft } = record;
+    void run(() => store.updateSubscription(id, { ...draft, reminderEnabled: enabled }));
+  };
 
-  const manage = () => Alert.alert("Open official management page?", `${billing.description}\n\nSubTrack cannot cancel or change this subscription for you.`, [{ text: "Not now", style: "cancel" }, { text: "Open official page", onPress: () => void WebBrowser.openBrowserAsync(resolveManagementUrl(record), { controlsColor: "#C9F72D", showTitle: true }) }]);
-  const startFollowUp = () => Alert.alert("Start local cancellation follow-up?", "Use this only after you have submitted a cancellation request through the official billing page. SubTrack will mark the record as uncertain until you confirm it.", [{ text: "Not yet", style: "cancel" }, { text: "Track request", onPress: () => void beginCancellationFollowUp(record.id) }]);
-
-  return <ScreenContainer className="px-5" containerClassName="bg-background"><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-    <View style={styles.nav}><Pressable accessibilityLabel="Go back" onPress={() => router.back()} hitSlop={10}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.navTitle}>Subscription</Text><Pressable accessibilityRole="button" accessibilityLabel="Edit subscription" onPress={() => router.push(`/subscription/edit?subscriptionId=${record.id}&serviceId=${record.serviceId}` as never)}><Text style={styles.edit}>Edit</Text></Pressable></View>
-    <View style={styles.hero}><ServiceBadge serviceId={record.serviceId} size="large" /><View style={styles.heroCopy}><View style={styles.heroTitle}><Text style={styles.title}>{service?.name ?? record.planName}</Text><Pill label={record.status} tone={tone} /></View><Text style={styles.plan}>{service ? record.planName : "Custom subscription"}</Text><Text style={styles.renewal}>{formatRelativeRenewal(record.renewalDate)}</Text></View></View>
-    <View style={styles.cost}><View><Text style={styles.costLabel}>{isShared ? "PLAN COST" : "YOU PAY"}</Text><Text style={styles.costAmount}>{formatCurrency(record.amount, record.currency)}</Text><Text style={styles.costCadence}>{record.cadence}</Text></View><View style={styles.costStats}><Text style={styles.statLabel}>MONTHLY ESTIMATE</Text><Text style={styles.statValue}>{formatCurrency(monthlyAmount(record.amount, record.cadence), record.currency)}</Text><Text style={styles.statLabel}>ANNUAL ESTIMATE</Text><Text style={styles.statValue}>{formatCurrency(annualAmount(record.amount, record.cadence), record.currency)}</Text></View></View>
-    <Text style={styles.section}>Ownership</Text><View style={styles.card}><Text style={styles.label}>{isShared ? "This plan is shared locally" : "This plan is assigned locally"}</Text>{ownership.map((share) => <View key={share.member.id} style={styles.ownershipRow}><View style={styles.ownershipCopy}><Text style={styles.value}>{share.member.name}{share.member.isOwner ? " (you)" : ""}</Text><Text style={styles.valueHint}>{share.percentage.toFixed(2)}% of the plan</Text></View><Text style={styles.ownershipValue}>{formatCurrency(share.monthly, record.currency)}/mo</Text></View>)}{ownerShare ? <Text style={styles.ownershipHint}>Your local share is an estimate based on the allocation you saved; it does not change provider billing.</Text> : null}</View>
-    <Text style={styles.section}>Renewal</Text><View style={styles.card}><Text style={styles.label}>Next renewal</Text><Text style={styles.value}>{formatDate(record.renewalDate)}</Text>{record.expectedNextCharge !== undefined ? <><View style={styles.divider} /><Text style={styles.label}>Expected next charge</Text><Text style={styles.value}>{formatCurrency(record.expectedNextCharge, record.currency)}{record.expectedNextCharge !== record.amount ? ` · ${record.expectedNextCharge > record.amount ? "higher" : "lower"} than the saved price` : " · matches the saved price"}</Text>{record.costChangeReason ? <Text style={styles.valueHint}>{record.costChangeReason}</Text> : null}</> : null}{record.reminderEnabled ? <><View style={styles.divider} /><Text style={styles.label}>Reminder</Text><Text style={styles.value}>On for this subscription</Text></> : null}</View>
-    {trialCountdown ? <View style={styles.trialCard}><Text style={styles.trialLabel}>TRIAL-TO-PAID COUNTDOWN</Text><Text style={styles.trialTitle}>{trialCountdown.dueInDays === 0 ? "Your trial changes today" : `Your trial changes in ${trialCountdown.dueInDays} day${trialCountdown.dueInDays === 1 ? "" : "s"}`}</Text><Text style={styles.trialBody}>You recorded an expected next charge of {formatCurrency(trialCountdown.expectedCharge, record.currency)} after {formatDate(trialCountdown.dueDate)}. Confirm the provider’s billing details before acting.</Text><SecondaryButton label="Review renewal decision" onPress={() => router.push({ pathname: "/decision-plan", params: { id: record.id } } as never)} /></View> : null}
-    <Text style={styles.section}>Renewal decision</Text><View style={styles.card}><Text style={styles.label}>Your current plan</Text><Text style={styles.value}>{record.renewalDecisionPlan ? record.renewalDecisionPlan.action.replace("-", " ") : "Not decided yet"}</Text>{record.intentTags?.length ? <Text style={styles.valueHint}>{record.intentTags.join(" · ")}</Text> : null}{record.valueCheckIn ? <Text style={styles.valueHint}>Value check: {record.valueCheckIn.useLevel} use · would buy again: {record.valueCheckIn.wouldBuyAgain}</Text> : null}</View><SecondaryButton label="Review renewal decision plan" onPress={() => router.push({ pathname: "/decision-plan", params: { id: record.id } } as never)} />
-    {planChanges.length ? <><Text style={styles.section}>Plan-change timeline</Text><View style={styles.card}>{planChanges.map((change) => <View key={change.id} style={styles.timelineEvent}><Text style={styles.timelineMarker}>↗</Text><View style={styles.timelineCopy}><Text style={styles.timelineTitle}>{change.previousPlanName} → {change.nextPlanName}</Text><Text style={styles.timelineBody}>{formatDate(change.changedAt)} · {formatCurrency(change.previousAmount, change.previousCurrency)} {change.previousCadence} → {formatCurrency(change.nextAmount, change.nextCurrency)} {change.nextCadence}</Text></View></View>)}</View></> : null}
-    <Text style={styles.section}>Billing source</Text><View style={styles.billing}><Text style={styles.billingTitle}>{billing.label}</Text><Text style={styles.billingBody}>{billing.description}</Text>{record.billingIdentity ? <><View style={styles.divider} /><Text style={styles.label}>Your local billing clue</Text><Text style={styles.value}>{record.billingIdentity}</Text></> : null}<Text style={styles.billingHint}>{service?.managementHint}</Text></View><PrimaryButton label="Manage officially" onPress={manage} /><Text style={styles.disclaimer}>This opens the official billing page. SubTrack does not confirm, cancel, or modify an external account.</Text>
-    <Text style={styles.section}>Cancellation evidence timeline</Text><View style={styles.followUp}><Text style={styles.followUpTitle}>{record.cancellationState === "confirmed" ? "Confirmed locally" : record.cancellationState === "pending" ? "Awaiting provider confirmation" : "Keep a cancellation trail"}</Text><Text style={styles.followUpBody}>{record.cancellationState === "confirmed" ? "This is your local record of the provider outcome. It does not independently verify a cancellation or refund." : record.cancellationState === "pending" ? "Do not assume the charge is stopped until the provider confirms it. Keep provider email or receipts outside SubTrack." : "After submitting an official cancellation request, mark it pending here to start a local evidence trail."}</Text>{cancellationEvents.map((event, index) => <View key={event.id} style={styles.timelineEvent}><Text style={styles.timelineMarker}>{index + 1}</Text><View style={styles.timelineCopy}><Text style={styles.timelineTitle}>{event.title}</Text><Text style={styles.timelineBody}>{formatDate(event.date)} · {event.detail}</Text></View></View>)}{record.cancellationState === "pending" ? <><PrimaryButton label="I received confirmation" onPress={() => void confirmCancellation(record.id)} /><SecondaryButton label="Edit evidence" onPress={() => router.push(`/subscription/edit?subscriptionId=${record.id}&serviceId=${record.serviceId}` as never)} /><SecondaryButton label="Open official page again" onPress={manage} /></> : record.cancellationState === "confirmed" ? <><SecondaryButton label="Review evidence" onPress={() => router.push(`/subscription/edit?subscriptionId=${record.id}&serviceId=${record.serviceId}` as never)} /><SecondaryButton label="Open official page" onPress={manage} /></> : <SecondaryButton label="Track a cancellation request" onPress={startFollowUp} />}</View>
-    <Text style={styles.section}>Update local status</Text><View style={styles.statuses}>{(["active", "trial", "uncertain"] as SubscriptionStatus[]).map((item) => <Pressable key={item} accessibilityRole="button" onPress={() => void updateStatus(record.id, item)} style={({ pressed }) => [styles.status, record.status === item && styles.statusSelected, pressed && styles.pressed]}><Text style={[styles.statusText, record.status === item && styles.statusTextSelected]}>{item}</Text></Pressable>)}</View>
-    {record.notes ? <><Text style={styles.section}>Note</Text><View style={styles.card}><Text style={styles.note}>{record.notes}</Text></View></> : null}<SecondaryButton label="Compare service plans" onPress={() => router.push({ pathname: "/compare/[serviceId]", params: { serviceId: record.serviceId } })} />
-  </ScrollView></ScreenContainer>;
+  return <FinancePage title="Subscription" trailing={<RoundAction icon="create-outline" label="Edit subscription" onPress={() => edit()} />}>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+      <ServiceBadge serviceId={record.serviceId} size="large" label={record.planName} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ color: colors.foreground, fontFamily: financeType.bold, fontSize: 24, letterSpacing: -0.5 }}>{subscriptionName(record)}</Text>
+        {service ? <Text style={{ color: colors.muted, fontFamily: financeType.regular, fontSize: 12, marginTop: 3 }}>{record.planName}</Text> : null}
+      </View>
+      <View style={{ backgroundColor: colors.elevated, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 6 }}>
+        <Text style={{ color: pending || record.status === "trial" ? colors.warning : colors.primary, fontFamily: financeType.medium, fontSize: 10 }}>{archived ? "Archived" : record.status === "trial" ? "Trial" : pending ? "Pending" : record.status === "uncertain" ? "Check status" : "Active"}</Text>
+      </View>
+    </View>
+    <Surface>
+      <MetricLabel>{archived ? "Last saved price" : record.status === "trial" ? "Price after trial" : "Your plan price"} · {record.currency}</MetricLabel>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", gap: 8 }}>
+        <Text style={{ color: colors.foreground, fontFamily: financeType.bold, fontSize: 32, letterSpacing: -1 }}>{money(record.amount, record.currency)}</Text>
+        <Text style={{ color: colors.muted, fontFamily: financeType.regular, fontSize: 12 }}>{cadenceCopy[record.cadence]}</Text>
+      </View>
+      {record.cadence !== "monthly" ? <MetricLabel>{money(monthlyAmount(record.amount, record.cadence), record.currency)} monthly equivalent · {money(annualAmount(record.amount, record.cadence), record.currency)} / year</MetricLabel> : null}
+      <RowDivider />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.muted, fontFamily: financeType.regular, fontSize: 11 }}>{archived ? "Cancelled record" : record.status === "trial" ? "Trial ends" : record.autoRenewStatus === "off" ? "Last saved payment date" : "Next payment"}</Text>
+          <Text style={{ color: colors.foreground, fontFamily: financeType.medium, fontSize: 14, marginTop: 3 }}>{archived ? record.cancellationConfirmedAt ? formatDate(record.cancellationConfirmedAt) : "No future renewals tracked" : next ? formatDate(next.due) : "No upcoming renewal"}</Text>
+        </View>
+      </View>
+      {!archived && record.expectedNextCharge !== undefined && record.expectedNextCharge !== record.amount ? <View style={{ gap: 5 }}>
+        <MetricLabel>Expected next charge</MetricLabel>
+        <Text style={{ color: record.expectedNextCharge > record.amount ? colors.warning : colors.primary, fontFamily: financeType.semi, fontSize: 17 }}>{money(record.expectedNextCharge, record.currency)}</Text>
+        {record.costChangeReason ? <Copy muted>{record.costChangeReason}</Copy> : null}
+      </View> : null}
+    </Surface>
+    {error ? <Notice error>{error}</Notice> : null}
+    {pending ? <Surface>
+      <SectionHeading title="Did the cancellation go through?" />
+      <Copy muted>Check your provider’s confirmation before marking this plan cancelled.</Copy>
+      {record.cancellationFollowUpDate ? <Text style={{ color: colors.warning, fontFamily: financeType.medium, fontSize: 12 }}>Follow-up · {deadlineLabel(record.cancellationFollowUpDate)}</Text> : null}
+      <Button label="I received confirmation" disabled={busy} onPress={() => setDialog("confirm")} />
+      <FinanceLink icon="create-outline" title="Edit cancellation record" onPress={() => edit("cancellation")} />
+    </Surface> : !archived ? <View style={{ gap: 12 }}>
+      <SectionHeading title={record.status === "trial" ? "Make the call before it bills" : "Is this renewal still right for you?"} />
+      <Text style={{ color: colors.muted, fontFamily: financeType.regular, fontSize: 12, lineHeight: 20 }}>{record.renewalDecisionPlan ? `Your plan: ${decisionCopy[record.renewalDecisionPlan.action]}.` : record.status === "trial" ? `Review ${service?.name ?? "your plan"} before ${shortDate(record.trialEndDate ?? record.renewalDate)}.` : "Keep what you use. Reconsider what you don’t."}</Text>
+      <Button label={record.status === "trial" ? "Review this trial" : "Review renewal"} onPress={review} />
+    </View> : null}
+    <View style={{ gap: 4 }}>
+      <FinanceLink icon="open-outline" title="Manage with provider" detail={`Opens ${billing.label}'s official page`} onPress={() => setDialog("manage")} />
+      {!pending && !archived ? <FinanceLink icon="shield-checkmark-outline" title="Track a cancellation request" detail="After you’ve requested cancellation with your provider" onPress={() => setDialog("follow-up")} /> : null}
+    </View>
+    {Platform.OS !== "web" && !archived ? <Surface>
+      <ToggleRow label="Renewal reminder" description={store.settings.notificationsEnabled ? `${store.settings.reminderDays} days before payment` : "Reminders are paused in Settings"} value={record.reminderEnabled} disabled={busy} onChange={changeReminder} />
+      <FinanceLink icon="notifications-outline" title="Reminder settings" onPress={() => router.push("/(tabs)/settings")} />
+    </Surface> : null}
+    <View>
+      <Disclosure title="Billing & plan options" open={billingOpen} onToggle={() => setBillingOpen(!billingOpen)}>
+        <MetricLabel>Billed through</MetricLabel><Copy>{billing.label}</Copy>
+        <Copy muted>{billing.description}</Copy>
+        {record.billingIdentity ? <><MetricLabel>Statement or account label</MetricLabel><Copy selectable>{record.billingIdentity}</Copy></> : null}
+        <MetricLabel>Auto-renew: {record.autoRenewStatus === "on" ? "On" : record.autoRenewStatus === "off" ? "Off" : "Not checked"} · as you recorded it</MetricLabel>
+        {service ? <>
+          <FinanceLink icon="swap-horizontal-outline" title="Compare plan options" onPress={() => router.push(`/compare/${service.id}` as never)} />
+          <FinanceLink icon="globe-outline" title="Compare prices in your region" onPress={() => router.push({ pathname: "/regional-plans", params: { serviceId: service.id } })} />
+          <FinanceLink icon="information-circle-outline" title="Service information" onPress={() => router.push(`/service/${service.id}` as never)} />
+        </> : null}
+      </Disclosure>
+      <Disclosure title={shares.length > 1 ? "Who shares this plan" : "Share the cost"} open={sharingOpen} onToggle={() => setSharingOpen(!sharingOpen)}>
+        {shares.length > 1 ? shares.map((share) => <View key={share.member.id} style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+          <View style={{ flex: 1 }}><Copy>{share.member.name}{share.member.isOwner ? " (you)" : ""}</Copy><MetricLabel>{share.percentage.toFixed(2)}% of the saved price</MetricLabel></View>
+          <Text style={{ color: colors.foreground, fontFamily: financeType.medium, fontSize: 12 }}>{money(share.monthly, record.currency)} / mo</Text>
+        </View>) : <Copy muted>Split the cost with people you share with. This won’t change provider billing.</Copy>}
+        <FinanceLink icon="people-outline" title="Edit cost sharing" onPress={() => edit("sharing")} />
+      </Disclosure>
+      <Disclosure title="Notes & history" open={historyOpen} onToggle={() => setHistoryOpen(!historyOpen)}>
+        {record.notes ? <Copy>{record.notes}</Copy> : null}
+        {record.renewalDecisionPlan?.note ? <><MetricLabel>Your decision note</MetricLabel><Copy>{record.renewalDecisionPlan.note}</Copy></> : null}
+        {record.valueCheckIn ? <Copy muted>Your check-in: {record.valueCheckIn.useLevel} use · would choose again: {record.valueCheckIn.wouldBuyAgain}</Copy> : null}
+        {changes.map((change) => <View key={change.id} style={{ gap: 5 }}><MetricLabel>{formatDate(change.changedAt)}</MetricLabel><Copy>{change.previousPlanName} → {change.nextPlanName}</Copy><Copy muted>{money(change.previousAmount, change.previousCurrency)} → {money(change.nextAmount, change.nextCurrency)}</Copy><RowDivider /></View>)}
+        {cancellationEvents.map((event) => <View key={event.id} style={{ gap: 5 }}><MetricLabel>{formatDate(event.date)}</MetricLabel><Copy>{event.title}</Copy><Copy muted>{event.detail}</Copy><RowDivider /></View>)}
+        {!record.notes && !record.renewalDecisionPlan?.note && !record.valueCheckIn && !changes.length && !cancellationEvents.length ? <Copy muted>No notes or changes recorded yet.</Copy> : null}
+      </Disclosure>
+    </View>
+    <ConfirmDialog visible={!!dialog} title={dialog === "manage" ? "Open your provider’s page?" : dialog === "follow-up" ? "Track your cancellation request?" : "Record this cancellation?"}
+      message={dialog === "manage" ? `${billing.label} handles your billing. Make changes there, then update your saved record here. SubTrack cannot cancel your plan for you.` : dialog === "follow-up" ? "Use this after you’ve requested cancellation with your provider. Your record will stay pending, with a follow-up in 7 days." : "Only continue if your provider has confirmed the cancellation. This archives the subscription and stops its renewal reminders."}
+      confirmLabel={dialog === "manage" ? "Open provider page" : dialog === "follow-up" ? "Track request" : "Record cancellation"} busy={busy} onCancel={() => setDialog(null)} onConfirm={() => void run(() => dialog === "manage" ? WebBrowser.openBrowserAsync(resolveManagementUrl(record)) : dialog === "follow-up" ? store.beginCancellationFollowUp(record.id) : store.confirmCancellation(record.id))} />
+  </FinancePage>;
 }
-
-const styles = StyleSheet.create({ content: { gap: 12, paddingBottom: 30, paddingTop: 12 }, nav: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, back: { color: "#F4F2E8", fontFamily: type.regular, fontSize: 34, lineHeight: 34 }, navTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 13 }, edit: { color: "#C9F72D", fontFamily: type.semi, fontSize: 13 }, hero: { alignItems: "center", flexDirection: "row", gap: 14, paddingTop: 5 }, heroCopy: { flex: 1 }, heroTitle: { alignItems: "center", flexDirection: "row", gap: 8, justifyContent: "space-between" }, title: { color: "#F4F2E8", flex: 1, fontFamily: type.bold, fontSize: 23, letterSpacing: -0.7 }, plan: { color: "#A8AD98", fontFamily: type.regular, fontSize: 12, marginTop: 3 }, renewal: { color: "#C9F72D", fontFamily: type.semi, fontSize: 11, marginTop: 4 }, cost: { backgroundColor: "#191E0F", borderColor: "#343A25", borderRadius: 14, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", padding: 18 }, costLabel: { color: "#A8AD98", fontFamily: type.semi, fontSize: 9, letterSpacing: 0.8 }, costAmount: { color: "#C9F72D", fontFamily: type.bold, fontSize: 28, letterSpacing: -0.8, marginTop: 6 }, costCadence: { color: "#A8AD98", fontFamily: type.regular, fontSize: 11, textTransform: "capitalize" }, costStats: { alignItems: "flex-end", gap: 3, paddingTop: 2 }, statLabel: { color: "#89917A", fontFamily: type.semi, fontSize: 8, letterSpacing: 0.5 }, statValue: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 12, marginBottom: 5 }, section: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 15, marginTop: 6 }, card: { backgroundColor: "#191E0F", borderColor: "#343A25", borderRadius: 12, borderWidth: 1, padding: 14 }, label: { color: "#A8AD98", fontFamily: type.regular, fontSize: 10 }, value: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 13, marginTop: 3 }, valueHint: { color: "#C5CBB8", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 5 }, divider: { backgroundColor: "#343A25", height: 1, marginVertical: 11 }, ownershipRow: { alignItems: "center", borderTopColor: "#343A25", borderTopWidth: 1, flexDirection: "row", justifyContent: "space-between", marginTop: 10, paddingTop: 10 }, ownershipCopy: { flex: 1 }, ownershipValue: { color: "#C9F72D", fontFamily: type.semi, fontSize: 11 }, ownershipHint: { color: "#89917A", fontFamily: type.regular, fontSize: 9, lineHeight: 14, marginTop: 10 }, trialCard: { backgroundColor: "#3B3519", borderColor: "#887330", borderRadius: 12, borderWidth: 1, gap: 7, padding: 14 }, trialLabel: { color: "#FFCF9B", fontFamily: type.semi, fontSize: 9, letterSpacing: 0.7 }, trialTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 14 }, trialBody: { color: "#E1D8B5", fontFamily: type.regular, fontSize: 10, lineHeight: 15 }, billing: { backgroundColor: "#202713", borderColor: "#485632", borderRadius: 12, borderWidth: 1, padding: 14 }, billingTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 13 }, billingBody: { color: "#A8AD98", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 3 }, billingHint: { color: "#C5CBB8", fontFamily: type.regular, fontSize: 10, fontStyle: "italic", lineHeight: 15, marginTop: 9 }, disclaimer: { color: "#89917A", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: -4, textAlign: "center" }, followUp: { backgroundColor: "#202713", borderColor: "#485632", borderRadius: 12, borderWidth: 1, gap: 10, padding: 14 }, followUpTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 13 }, followUpBody: { color: "#C5CBB8", fontFamily: type.regular, fontSize: 11, lineHeight: 16 }, timelineEvent: { alignItems: "flex-start", borderTopColor: "#485632", borderTopWidth: 1, flexDirection: "row", gap: 9, paddingTop: 10 }, timelineMarker: { alignItems: "center", backgroundColor: "#C9F72D", borderRadius: 10, color: "#172108", fontFamily: type.bold, fontSize: 10, height: 20, lineHeight: 20, overflow: "hidden", textAlign: "center", width: 20 }, timelineCopy: { flex: 1 }, timelineTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 11 }, timelineBody: { color: "#A8AD98", fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 2 }, statuses: { flexDirection: "row", flexWrap: "wrap", gap: 7 }, status: { backgroundColor: "#1D2212", borderColor: "#343A25", borderRadius: 10, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 8 }, statusSelected: { backgroundColor: "#C9F72D", borderColor: "#C9F72D" }, statusText: { color: "#C5CBB8", fontFamily: type.semi, fontSize: 10, textTransform: "capitalize" }, statusTextSelected: { color: "#172108" }, note: { color: "#C5CBB8", fontFamily: type.regular, fontSize: 12, lineHeight: 18 }, pressed: { opacity: 0.75 }, missing: { color: "#A8AD98", fontFamily: type.regular }, link: { color: "#C9F72D", fontFamily: type.semi, marginTop: 10 } });

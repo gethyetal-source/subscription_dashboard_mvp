@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, processLock } from "@supabase/supabase-js";
 import { Platform } from "react-native";
+import { isPublicSupabaseKey } from "./account-utils";
 
 const projectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -11,15 +12,33 @@ const serverStorage = {
   removeItem: async (_key: string) => undefined,
 };
 
-export const isSupabaseConfigured = Boolean(projectUrl && publishableKey);
+function hasSafePublicConfig() {
+  if (!projectUrl || !publishableKey || !isPublicSupabaseKey(publishableKey)) return false;
+  try {
+    const url = new URL(projectUrl);
+    return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
+export const isSupabaseConfigured = hasSafePublicConfig();
+export const supabaseSessionStorageKey = isSupabaseConfigured && projectUrl
+  ? `sb-${new URL(projectUrl).hostname.split(".")[0]}-auth-token`
+  : "subtrack.unconfigured-auth";
 
 export const supabase = isSupabaseConfigured
   ? createClient(projectUrl!, publishableKey!, {
       auth: {
         storage: isServerRender ? serverStorage : AsyncStorage,
+        storageKey: supabaseSessionStorageKey,
         autoRefreshToken: !isServerRender,
         persistSession: !isServerRender,
-        detectSessionInUrl: Platform.OS === "web",
+        flowType: "pkce",
+        experimental: { appendPkceFlowIdToRedirects: true },
+        // One trusted callback handler owns code exchanges on both platforms.
+        detectSessionInUrl: false,
+        ...(Platform.OS !== "web" ? { lock: processLock } : {}),
       },
     })
   : null;

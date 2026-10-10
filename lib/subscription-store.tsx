@@ -1,12 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
+import { Platform } from "react-native";
 
 import { portableSnapshot, snapshotSchema, type ValidatedSnapshot } from "@/lib/data-safety";
 import { LocalStateRepository, emptySnapshot, type LocalBackup } from "@/lib/local-state-repository";
-import { cancelSubscriptionReminders, scheduleSubscriptionReminders } from "@/lib/reminders";
+import { cancelSubscriptionReminders, scheduleSubscriptionReminders, serializeAccountReminders, suspendRenewalReminders } from "@/lib/reminders";
 import type { AppSettings, CatalogCorrectionDraft, CatalogCorrectionRequest, ChargeRecognitionCase, ChargeRecognitionDraft, HouseholdMember, PlanChangeEvent, SavingsEntry, SubscriptionDraft, SubscriptionRecord } from "@/lib/subscription-types";
 import { localDateKey } from "@/lib/subscription-utils";
 import { BACKUP_KEY } from "@/lib/data-safety";
+import { useAccount } from "./account";
+import { ACTIVE_LOCAL_ACCOUNT_KEY, localAccountStorage, UNREADABLE_STATE_KEY } from "./local-account-storage";
 
 export interface LocalSubscriptionSnapshot {
   subscriptions: SubscriptionRecord[];
@@ -59,20 +62,73 @@ async function withReminders(record: SubscriptionRecord, settings: AppSettings) 
   return { ...record, reminderIdentifier: identifiers[0], reminderIdentifiers: identifiers };
 }
 export function SubscriptionProvider({ children }: PropsWithChildren) {
+  const account = useAccount();
+  const accountId = account.canAccessApp ? account.accountId : undefined;
+  return <ScopedSubscriptionProvider key={accountId ?? "signed-out"} accountId={accountId}>{children}</ScopedSubscriptionProvider>;
+}
+
+function ScopedSubscriptionProvider({ children, accountId }: PropsWithChildren<{ accountId?: string }>) {
   const [state, setState] = useState<ValidatedSnapshot>(emptySnapshot);
   const [isReady, setReady] = useState(false);
   const [storageError, setStorageError] = useState<string>();
-  const [repository] = useState(() => new LocalStateRepository(AsyncStorage, setState));
+  const active = useRef(true);
+  const [storage] = useState(() => {
+    const scoped = accountId ? localAccountStorage(AsyncStorage, accountId) : Promise.resolve(null);
+    return {
+      getItem: async (key: string) => {
+        const adapter = await scoped;
+        if (!active.current) throw new Error("Sign in to read your local records.");
+        return adapter?.getItem(key) ?? null;
+      },
+      setItem: async (key: string, value: string) => {
+        const adapter = await scoped;
+        if (!adapter || !active.current) throw new Error("Sign in to change your local records.");
+        await adapter.setItem(key, value);
+      },
+    };
+  });
+  const [repository] = useState(() => new LocalStateRepository(storage, (next) => { if (active.current) setState(next); }));
   useEffect(() => {
     let mounted = true;
-    void repository.load().then(() => { if (mounted) { setStorageError(repository.recoveryError); setReady(true); } })
-      .catch(() => { if (mounted) { setStorageError("Storage is unavailable. Retry opening the app before making changes."); } });
-    return () => { mounted = false; };
-  }, [repository]);
+    active.current = true;
+    const prepare = async () => {
+      await repository.load();
+      await serializeAccountReminders(async () => {
+        if (!mounted) return;
+        await AsyncStorage.removeItem(ACTIVE_LOCAL_ACCOUNT_KEY);
+        if (Platform.OS !== "web") await suspendRenewalReminders();
+        if (!mounted || !accountId || repository.recoveryError) return;
+        if (Platform.OS !== "web") {
+          const current = repository.current;
+          const subscriptions = await Promise.all(current.subscriptions.map((record) => withReminders(record, current.settings)));
+          if (!mounted) {
+            await Promise.all(subscriptions.map(cancelSubscriptionReminders));
+            return;
+          }
+          // Notification IDs are device bookkeeping, not a user edit/recovery point.
+          await repository.update((next) => ({ ...next, subscriptions }), false, false);
+        }
+        if (mounted) await AsyncStorage.setItem(ACTIVE_LOCAL_ACCOUNT_KEY, accountId);
+      });
+      if (mounted) { setStorageError(repository.recoveryError); setReady(true); }
+    };
+    void prepare().catch(() => { if (mounted) setStorageError("Storage is unavailable. Retry opening the app before making changes."); });
+    return () => {
+      mounted = false;
+      active.current = false;
+      void serializeAccountReminders(async () => {
+        await AsyncStorage.removeItem(ACTIVE_LOCAL_ACCOUNT_KEY);
+        await suspendRenewalReminders();
+      }).catch(() => undefined);
+    };
+  }, [accountId, repository]);
 
   const actions = useMemo(() => {
     const update = async (recipe: (current: ValidatedSnapshot) => ValidatedSnapshot | Promise<ValidatedSnapshot>, recovery = false) => {
-      await repository.update(recipe, recovery);
+      await serializeAccountReminders(async () => {
+        if (!accountId || !active.current) throw new Error("Sign in to change your local records.");
+        await repository.update(recipe, recovery);
+      });
       setStorageError(repository.recoveryError);
     };
     const modify = async (id: string, transform: (record: SubscriptionRecord, current: ValidatedSnapshot) => SubscriptionRecord) => {
@@ -183,7 +239,8 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
           await Promise.all(current.subscriptions.map(cancelSubscriptionReminders));
           return emptySnapshot();
         }, true);
-        await AsyncStorage.multiRemove([BACKUP_KEY, "subtrack.unreadable-state.v1"]);
+        await storage.setItem(BACKUP_KEY, "[]");
+        await storage.setItem(UNREADABLE_STATE_KEY, "");
       },
       async saveChargeRecognitionCase(draft: ChargeRecognitionDraft) {
         const record = { ...draft, merchantLabel: draft.merchantLabel.trim(), currency: draft.currency?.toUpperCase(), id: newId("charge"), createdAt: now(), updatedAt: now() };
@@ -200,7 +257,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       async addSavingsEntry(draft: Omit<SavingsEntry, "id">) { await update((current) => ({ ...current, savingsEntries: [{ ...draft, id: newId("saving") }, ...(current.savingsEntries ?? [])] })); },
       async deleteSavingsEntry(id: string) { await update((current) => ({ ...current, savingsEntries: current.savingsEntries?.filter((item) => item.id !== id) })); },
     };
-  }, [repository]);
+  }, [accountId, repository, storage]);
   const value = useMemo(() => ({ ...state, chargeRecognitionCases: state.chargeRecognitionCases ?? [], catalogCorrectionRequests: state.catalogCorrectionRequests ?? [], isReady, storageError, ...actions }), [state, isReady, storageError, actions]);
   return <Store.Provider value={value}>{children}</Store.Provider>;
 }

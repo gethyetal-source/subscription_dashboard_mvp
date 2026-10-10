@@ -1,152 +1,56 @@
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-
-import { ScreenContainer } from "@/components/screen-container";
-import { normalizeCloudEmail } from "@/lib/cloud-sync-auth-utils";
-import { useCloudSync } from "@/lib/cloud-sync";
-import { useThemeContext } from "@/lib/theme-provider";
-import { useThemedStyles } from "@/lib/ui-theme";
-
-const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
-
-function initials(name?: string, email?: string) {
-  const source = (name?.trim() || email?.trim() || "S").split(/\s+/);
-  return source.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("");
-}
+import { useEffect, useState } from "react";
+import { Button, Card, ConfirmDialog, Copy, Field, Notice, Page } from "@/components/app-ui";
+import { useAccount } from "@/lib/account";
 
 export default function ProfileScreen() {
-  const { colorScheme } = useThemeContext();
-  const styles = useThemedStyles(useMemo(() => makeStyles(colorScheme === "dark"), [colorScheme]));
-  const { isConfigured, isLoading, userEmail, profileName, needsProfileSetup, pendingEmailChange, updateProfile, updateEmail, resendEmailChange, signOut } = useCloudSync();
-  const [name, setName] = useState(profileName ?? "");
-  const [emailInput, setEmailInput] = useState(userEmail ?? "");
+  const account = useAccount();
+  const [name, setName] = useState(account.profileName ?? "");
+  const [email, setEmail] = useState(account.userEmail ?? "");
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => setName(profileName ?? ""), [profileName]);
-  useEffect(() => setEmailInput(userEmail ?? ""), [userEmail]);
-
-  const saveProfile = async () => {
-    try {
-      setBusy(true);
-      await updateProfile(name);
-      Alert.alert("Profile saved", "Your display name is updated for this SubTrack cloud account.");
-    } catch (error) {
-      Alert.alert("Profile", error instanceof Error ? error.message : "We could not save your profile. Please try again.");
-    } finally {
-      setBusy(false);
-    }
+  const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
+  const [logoutVisible, setLogoutVisible] = useState(false);
+  useEffect(() => setName(account.profileName ?? ""), [account.profileName]);
+  useEffect(() => setEmail(account.userEmail ?? ""), [account.userEmail]);
+  const run = async (operation: () => Promise<void>, success?: string) => {
+    if (busy) return;
+    setBusy(true); setMessage(""); setFailed(false);
+    try { await operation(); if (success) setMessage(success); }
+    catch (error) { setFailed(true); setMessage(error instanceof Error ? error.message : "Your account could not be updated. Please try again."); }
+    finally { setBusy(false); }
   };
-
-  const saveEmail = async () => {
-    try {
-      setBusy(true);
-      const normalizedEmail = normalizeCloudEmail(emailInput);
-      await updateEmail(normalizedEmail);
-      Alert.alert("Check your inbox", "We sent an email-change confirmation link. Open the newest link to finish changing the sign-in email for this account.");
-    } catch (error) {
-      Alert.alert("Email address", error instanceof Error ? error.message : "We could not begin that email change. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const resendEmailConfirmation = async () => {
-    try {
-      setBusy(true);
-      await resendEmailChange();
-      Alert.alert("Confirmation resent", "We sent a fresh email-change confirmation link. Open the newest link from your inbox.");
-    } catch (error) {
-      Alert.alert("Email address", error instanceof Error ? error.message : "We could not resend the confirmation. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const confirmSignOut = () => {
-    Alert.alert("Sign out of cloud sync?", "Your local subscriptions stay on this device. You can sign in again whenever you need cloud backup.", [
-      { text: "Keep signed in", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: () => void signOut() },
-    ]);
-  };
-
-  if (isLoading) return <ScreenContainer containerClassName="bg-background"><View style={styles.center}><ActivityIndicator color={styles.loader.color as string} /><Text style={styles.loadingText}>Checking your account…</Text></View></ScreenContainer>;
-
-  if (!isConfigured || !userEmail) {
-    return <ScreenContainer className="px-5" containerClassName="bg-background"><View style={styles.guestWrap}>
-      <View style={styles.avatar}><Text style={styles.avatarText}>S</Text></View>
-      <Text style={styles.title}>Your profile</Text>
-      <Text style={styles.body}>{isConfigured ? "Create or sign in to an optional cloud account to save a profile name, back up this device, and keep your records available when you choose to restore them." : "Cloud profiles are unavailable in this build because cloud sync has not been configured yet."}</Text>
-      {isConfigured ? <Pressable onPress={() => router.push("/cloud-sync" as never)} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}><Text style={styles.primaryButtonText}>Create or sign in</Text></Pressable> : null}
-    </View></ScreenContainer>;
-  }
-
-  return <ScreenContainer className="px-5" containerClassName="bg-background"><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-    <Text style={styles.eyebrow}>YOUR ACCOUNT</Text>
-    <View style={styles.hero}><View style={styles.avatar}><Text style={styles.avatarText}>{initials(profileName, userEmail)}</Text></View><View style={styles.heroCopy}><Text style={styles.title}>{profileName || "Finish your profile"}</Text><Text style={styles.email}>{userEmail}</Text></View></View>
-    <View style={styles.card}>
-      <Text style={styles.cardLabel}>PROFILE DETAILS</Text>
-      <Text style={styles.label}>Display name</Text>
-      <TextInput autoCapitalize="words" autoComplete="name" onChangeText={setName} placeholder="How should SubTrack address you?" placeholderTextColor={styles.placeholder.color as string} style={styles.input} value={name} />
-      {needsProfileSetup ? <Text style={styles.helper}>Add a name to finish setting up this cloud profile.</Text> : <Text style={styles.helper}>This name appears only in your SubTrack profile on signed-in devices.</Text>}
-      <Pressable disabled={busy} onPress={() => void saveProfile()} style={({ pressed }) => [styles.primaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.primaryButtonText}>{busy ? "Saving…" : "Save profile"}</Text></Pressable>
-    </View>
-    <View style={styles.card}>
-      <Text style={styles.cardLabel}>CLOUD ACCOUNT</Text>
-      <Text style={styles.detailTitle}>Sign-in email</Text>
-      <TextInput autoCapitalize="none" autoComplete="email" keyboardType="email-address" onChangeText={setEmailInput} placeholder="you@example.com" placeholderTextColor={styles.placeholder.color as string} style={styles.input} value={emailInput} />
-      <Text style={styles.detailBody}>Changing your email requires confirmation from the newest link we send. Keep using {userEmail} until confirmation is complete.</Text>
-      <Pressable disabled={busy} onPress={() => void saveEmail()} style={({ pressed }) => [styles.secondaryButton, (pressed || busy) && styles.pressed, busy && styles.disabled]}><Text style={styles.secondaryButtonText}>{busy ? "Working…" : "Change sign-in email"}</Text></Pressable>
-      {pendingEmailChange ? <View style={styles.pendingEmail}><Text style={styles.pendingEmailTitle}>Confirmation waiting</Text><Text style={styles.pendingEmailBody}>We are waiting for {pendingEmailChange} to be confirmed. Check that inbox and spam folder, then open the newest link.</Text><Pressable disabled={busy} onPress={() => void resendEmailConfirmation()} style={({ pressed }) => [styles.pendingEmailAction, (pressed || busy) && styles.pressed]}><Text style={styles.pendingEmailActionText}>Resend confirmation</Text></Pressable></View> : null}
-      <Text style={styles.detailTitle}>Password</Text><Text style={styles.detailBody}>Set a new password while signed in, or use the same screen after opening a recovery email.</Text>
-      <Pressable onPress={() => router.push("/password-reset" as never)} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}><Text style={styles.secondaryButtonText}>Change password</Text></Pressable>
-      <Text style={styles.detailTitle}>Backup</Text><Text style={styles.detailBody}>Manual sync and restore choices are available from Cloud sync.</Text>
-      <Pressable onPress={() => router.push("/cloud-sync" as never)} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}><Text style={styles.secondaryButtonText}>Manage cloud sync</Text></Pressable>
-      <Text style={styles.detailTitle}>Account deletion</Text><Text style={styles.detailBody}>Permanently remove this optional cloud account and its remote backup. Local records on this device remain under your control.</Text>
-      <Pressable onPress={() => router.push("/delete-account" as never)} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}><Text style={styles.secondaryButtonText}>Delete cloud account</Text></Pressable>
-    </View>
-    <Pressable onPress={() => router.push("/privacy-policy" as never)} style={({ pressed }) => [styles.privacyLink, pressed && styles.pressed]}><Text style={styles.privacyLinkText}>Privacy policy</Text></Pressable><Pressable onPress={confirmSignOut} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}><Text style={styles.signOutText}>Sign out of cloud sync</Text></Pressable>
-  </ScrollView></ScreenContainer>;
-}
-
-function makeStyles(isDark: boolean) {
-  const palette = isDark ? { canvas: "#12160B", surface: "#191E0F", text: "#F4F2E8", muted: "#A8AD98", border: "#343A25", accent: "#C9F72D", accentText: "#172108", danger: "#FF9B8C", placeholder: "#78806C", softAccent: "#28301B" } : { canvas: "#F4F3EB", surface: "#FFFEF8", text: "#20241A", muted: "#65695B", border: "#D9D9CC", accent: "#4A6510", accentText: "#F4F3EB", danger: "#B53A33", placeholder: "#7B7F70", softAccent: "#E5EDD2" };
-  return StyleSheet.create({
-    content: { paddingBottom: 34, paddingTop: 22 },
-    center: { alignItems: "center", flex: 1, justifyContent: "center" },
-    guestWrap: { alignItems: "center", flex: 1, justifyContent: "center", paddingHorizontal: 18 },
-    eyebrow: { color: palette.accent, fontFamily: type.semi, fontSize: 10, letterSpacing: 1.25 },
-    hero: { alignItems: "center", flexDirection: "row", gap: 14, marginTop: 13 },
-    heroCopy: { flex: 1 },
-    avatar: { alignItems: "center", backgroundColor: palette.accent, borderRadius: 32, height: 64, justifyContent: "center", width: 64 },
-    avatarText: { color: palette.accentText, fontFamily: type.bold, fontSize: 21 },
-    title: { color: palette.text, fontFamily: type.bold, fontSize: 25, letterSpacing: -0.7 },
-    email: { color: palette.muted, fontFamily: type.regular, fontSize: 12, marginTop: 4 },
-    body: { color: palette.muted, fontFamily: type.regular, fontSize: 13, lineHeight: 20, marginTop: 18, textAlign: "center" },
-    card: { backgroundColor: palette.surface, borderColor: palette.border, borderRadius: 16, borderWidth: 1, marginTop: 22, padding: 16 },
-    cardLabel: { color: palette.accent, fontFamily: type.semi, fontSize: 10, letterSpacing: 1.1 },
-    label: { color: palette.text, fontFamily: type.semi, fontSize: 12, marginTop: 16 },
-    input: { backgroundColor: palette.canvas, borderColor: palette.border, borderRadius: 11, borderWidth: 1, color: palette.text, fontFamily: type.regular, fontSize: 13, height: 48, marginTop: 7, paddingHorizontal: 12 },
-    helper: { color: palette.muted, fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 7 },
-    detailTitle: { color: palette.text, fontFamily: type.semi, fontSize: 12, marginTop: 16 },
-    detailBody: { color: palette.muted, fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 4 },
-    pendingEmail: { backgroundColor: palette.softAccent, borderColor: palette.border, borderRadius: 11, borderWidth: 1, marginTop: 14, padding: 12 },
-    pendingEmailTitle: { color: palette.text, fontFamily: type.semi, fontSize: 12 },
-    pendingEmailBody: { color: palette.muted, fontFamily: type.regular, fontSize: 10, lineHeight: 15, marginTop: 4 },
-    pendingEmailAction: { alignSelf: "flex-start", justifyContent: "center", marginTop: 7, minHeight: 32 },
-    pendingEmailActionText: { color: palette.accent, fontFamily: type.semi, fontSize: 11 },
-    primaryButton: { alignItems: "center", backgroundColor: palette.accent, borderRadius: 11, justifyContent: "center", marginTop: 20, minHeight: 48, paddingHorizontal: 16 },
-    primaryButtonText: { color: palette.accentText, fontFamily: type.bold, fontSize: 13 },
-    secondaryButton: { alignItems: "center", borderColor: palette.border, borderRadius: 11, borderWidth: 1, justifyContent: "center", marginTop: 18, minHeight: 46, paddingHorizontal: 16 },
-    secondaryButtonText: { color: palette.text, fontFamily: type.semi, fontSize: 12 },
-    signOutButton: { alignItems: "center", justifyContent: "center", marginTop: 22, minHeight: 40 },
-    signOutText: { color: palette.danger, fontFamily: type.semi, fontSize: 12 },
-    privacyLink: { alignItems: "center", justifyContent: "center", marginTop: 20, minHeight: 32 },
-    privacyLinkText: { color: palette.accent, fontFamily: type.semi, fontSize: 11 },
-    loadingText: { color: palette.muted, fontFamily: type.regular, fontSize: 12, marginTop: 10 },
-    loader: { color: palette.accent },
-    placeholder: { color: palette.placeholder },
-    pressed: { opacity: 0.74 },
-    disabled: { opacity: 0.55 },
-  });
+  return <Page title="Your account">
+    {message ? <Notice error={failed}>{message}</Notice> : null}
+    <Card title={account.profileName || "Welcome to SubTrack"}>
+      <Copy>{account.userEmail}</Copy>
+      <Copy muted>{account.providers.includes("google") ? "Google is connected to this account." : "Signed in with email."} Your login is remembered on this device.</Copy>
+    </Card>
+    <Card title="Profile">
+      <Field label="Display name" value={name} onChangeText={setName} autoComplete="name" autoCapitalize="words" maxLength={120} editable={!busy} />
+      <Copy muted>Only account details, such as this name and your sign-in email, are stored in Supabase.</Copy>
+      <Button label={busy ? "Saving…" : "Save profile"} disabled={busy} onPress={() => void run(() => account.updateProfile(name), "Profile saved.")} />
+    </Card>
+    <Card title="Sign-in details">
+      <Field label="Sign-in email" value={email} onChangeText={setEmail} autoComplete="email" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} editable={!busy} />
+      <Copy muted>Confirm the newest link we send before using your new email. Google sign-in continues to use the account selected with Google.</Copy>
+      <Button label="Change sign-in email" secondary disabled={busy} onPress={() => void run(() => account.updateEmail(email), "Check your inbox for the email-change confirmation.")} />
+      {account.pendingEmailChange ? <>
+        <Copy muted>Confirmation is waiting for {account.pendingEmailChange}.</Copy>
+        <Button label="Resend email confirmation" secondary disabled={busy} onPress={() => void run(account.resendEmailChange, "Confirmation email resent.")} />
+      </> : null}
+      <Button label={account.providers.includes("email") ? "Change password" : "Set a password"} secondary disabled={busy} onPress={() => router.push("/password-reset")} />
+    </Card>
+    <Card title="Your data stays here">
+      <Copy muted>Subscription prices, renewals, notes, savings, household plans, and backups stay on this device. They are not uploaded or shared across devices.</Copy>
+      <Copy muted>Each account has its own local records. Logging out hides them but does not erase them. Log back into the same account on this device to use them again.</Copy>
+      <Button label="Local backup & restore" secondary disabled={busy} onPress={() => router.push("/backup")} />
+      <Button label="Privacy policy" secondary onPress={() => router.push("/privacy-policy")} />
+    </Card>
+    <Button label="Log out" secondary disabled={busy} onPress={() => setLogoutVisible(true)} />
+    <Button label="Delete account" danger disabled={busy} onPress={() => router.push("/delete-account")} />
+    <ConfirmDialog visible={logoutVisible} title="Log out of SubTrack?" message="You will need to sign in again. Your records stay on this device, hidden until the same account signs in. Renewal reminders and the widget pause while logged out." confirmLabel="Log out" danger busy={busy} onCancel={() => setLogoutVisible(false)} onConfirm={() => void run(async () => {
+      await account.signOut(); setLogoutVisible(false);
+    })} />
+  </Page>;
 }

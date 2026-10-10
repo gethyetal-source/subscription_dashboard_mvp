@@ -1,119 +1,81 @@
-# SubTrack MVP — Mobile Interface Design
+# SubTrack interface
 
-## Product intent
+## Direction
 
-SubTrack is a **privacy-first subscription dashboard** for people who want a simple picture of their recurring services without connecting a bank account or inbox. It helps users discover services, add their real subscriptions manually, understand upcoming renewals, compare plan options, and open the correct official management page.
+The primary job is to understand recurring spending and avoid unwanted renewals. The user selected a light, premium consumer-finance direction and supplied emerald finance/wellbeing references. The design uses those references for hierarchy, spacing, and color, not for bank-account functionality.
 
-The interface is designed for **portrait mobile screens (9:16)** and one-handed use. It combines iOS-native interaction patterns with a **Google-inspired Material clarity**: a calm white canvas, restrained one-pixel dividers, spacious 8-point rhythm, softly rounded 16–24 px surfaces, clear hierarchy, readable navigation, and direct action labels. The experience must feel simple rather than decorative.
+This is a reference-informed design hypothesis, not a claim of completed user research.
 
-## Brand and visual direction
+## Visual system
 
-The product should feel calm, competent, and financially responsible rather than aggressively “budgeting” focused. The redesigned language uses Google-style blue as the primary action color, a white/soft-gray canvas, subtle neutral outlines, and limited semantic feedback colors. **Poppins is the only typeface** used for all interface text, with Regular for supporting information, Medium for controls, SemiBold for labels, and Bold only for high-level numeric and page hierarchy.
+- Emerald primary `#087F65`, pale canvas `#F7FAF9`, white surfaces, ink `#142B25`.
+- Supporting text `#5B7067`; warning and destructive colors only for meaningful states.
+- Dark mode keeps the same hierarchy with a deep green canvas and mint actions.
+- Poppins Regular, Medium, SemiBold, and Bold. Bold is reserved for page hierarchy and key amounts.
+- Rounded 14 px inputs/actions, 18–24 px surfaces, restrained outlines, and 44–48 px touch targets. Seven-column calendar cells are narrower on small phones.
+- Centered web content, maximum width 760 px; sheets maximum width 480 px.
 
-## Electric blue and lime UX refresh
+## Navigation and hierarchy
 
-The revised experience uses a **deep electric-blue canvas** as the persistent product environment, with quiet white data surfaces that make renewal, spend, and service information easy to scan. **Chartreuse/lime** is reserved for page titles, the active tab, key totals, and the highest-priority action. This creates a clearer visual hierarchy without using lime for long reading text on a white surface.
+Three tabs: **Overview**, **Subscriptions**, and **Insights**. Settings is a header action. Service discovery and import are part of Add, not primary tabs. Existing secondary URLs remain accessible.
 
-The home screen follows a deliberate thumb-first sequence: understand total spend, review the next charge, then explore deeper tools. Primary tabs receive a compact blue header that combines the screen name, a one-line purpose statement, and any most-used action. Supporting controls use consistent 44 px minimum touch targets, selected chip states, and lower-contrast metadata. Long dashboards keep insights grouped by intent—review, plan, and discover—rather than presenting every analysis card as equal priority.
+### Overview
 
-| UX surface | Revised behavior | Visual treatment |
-|---|---|---|
-| Primary headers | Explain the current task and keep the main action within reach | Royal blue surface with chartreuse title and pale-blue supporting copy |
-| Spend snapshot | Make the monthly estimate the first financial decision point | Layered blue card, lime total, concise annual comparison |
-| Review actions | Put the next renewal or trial ahead of secondary analysis | One clear review card before charts and category detail |
-| Lists and catalog | Favor fast scanning and direct actions | High-contrast white cards, larger service mark, restrained metadata, 44 px interactions |
-| Navigation | Keep the four core destinations stable and recognizable | Persistent royal-blue footer with lime active state |
+1. Compact header with Settings and, for existing records, Add.
+2. Emerald monthly-equivalent summary with a currency selector and amount-visibility control.
+3. Subordinate remaining-this-month payment forecast and budget remaining, or yearly equivalent.
+4. One deadline-ranked attention item with access to the complete queue.
+5. Date-grouped upcoming payments, without separate “next” and “more” renewal cards.
 
-| Role | Color | Usage |
-|---|---|---|
-| Ink | `#202124` | Primary titles, tab labels, high-confidence text |
-| Canvas | `#F8F9FA` | Main screen background |
-| Surface | `#FFFFFF` | Cards, sheets, input areas |
-| Google Blue | `#1A73E8` | Primary actions, selected controls, active tab |
-| Blue Tint | `#E8F0FE` | Selected filters and low-emphasis blue surfaces |
-| Green | `#188038` | Positive status and active subscription state |
-| Amber | `#F9AB00` | Upcoming renewal and trial alerts |
-| Red | `#D93025` | Delete and destructive action states |
-| Slate | `#5F6368` | Supporting copy and metadata |
+The empty state has one working Add action, not empty charts or disabled summary cards.
 
-## Redesign system
+### Subscriptions
 
-The dashboard uses a simple document-like layout rather than dark hero cards or decorative gradients. The key financial number sits in a white summary surface with a crisp blue indicator and supporting text beneath it. Every list item is a clean outlined surface with an identifiable service mark, two lines of text, and a direct value. Filter chips use a single selected blue-tint state; empty states remain quiet and helpful.
+Search and Current/Trials/Archived filters sit above a scannable ledger. Each row opens details. Price/date edits, full edits, and removal sit in the row overflow. Current records include uncertain plans; archived records stay outside the default list. Rows are ordered by the projected payment or trial deadline, not a stale original billing date.
 
-Navigation stays familiar and lightweight. Bottom navigation has plain iconography, a clear blue active label, and no extra visual chrome. Screens use short page titles, persistent search where relevant, large direct touch targets, and single-purpose primary buttons. Poppins weights are used intentionally so dense information remains highly scannable on a narrow portrait screen.
+Charge recognition and the billing-reference index are secondary ledger actions.
 
-## Screen list
+### Add and edit
 
-| Screen | Primary content and functionality |
-|---|---|
-| Home dashboard | Monthly and annual spending estimate, upcoming renewal cards, trial alerts, quick add action, and a small insight about subscription coverage. |
-| Discover catalog | Search, category chips, featured services, filter by category, and service cards that open a detail view. |
-| Service detail | Service overview, plan cards, reference pricing, category, last-verified label, compare plans action, and “Add to my subscriptions.” |
-| Compare plans | Side-by-side or segmented plan comparison of tier, billing cycle, indicative price, key benefits, and a recommended use-case label without making a financial recommendation. |
-| My subscriptions | Active, trial, cancelled, and uncertain subscription lists; filters; spending totals; swipe-safe edit and archive actions. |
-| Add/edit subscription sheet | Service, plan, price, billing cadence, next renewal, trial end, billing source, and user note fields with save validation. |
-| Subscription detail | Personal record, spending estimate, renewal details, reminder setting, plan info, billing-source explanation, edit, mark-cancelled, and official-management action. |
-| Household | Local-only household members, per-person equal shared-plan contributions, and entry points to assign shared plans. No account, cloud sync, or cross-device sharing is implied. |
-| Official management sheet | A clear statement of who bills the user, what SubTrack can and cannot do, and a single action that opens an official provider, Apple, or Google destination. |
-| Settings | Reminder defaults, data export placeholder, privacy explanation, catalog feedback entry point, and local-data reset control. |
+Add starts with service search, popular shortcuts, a custom-service option, and import. The detail form asks for the name, actual price, currency, cadence, and next payment or trial date. Catalog prices never silently become the user's actual price.
 
-## Key user flows
+Billing source, price expectations, auto-renew, notes, cost sharing, and cancellation evidence are progressively disclosed. Known and custom plans use the same form. Free amounts and dates including today are valid. Editing an archived plan does not silently reactivate it.
 
-### Discover and add a subscription
+### Details and renewal review
 
-1. The user opens **Discover** from the tab bar.
-2. The user searches or selects a category such as AI or Entertainment.
-3. The user opens a service card to inspect plan details and indicative price information.
-4. The user taps **Add to my subscriptions**.
-5. A sheet lets the user enter their actual plan, price, renewal date, and billing source.
-6. On save, the app confirms that the record is stored locally and returns the user to the subscription detail.
+Show the plan price and deadline first, followed by the relevant renewal review or pending-cancellation action. Provider management is an explicit handoff with confirmation. Recording a decision never changes a provider account.
 
-### Monitor a renewal
+Reminders, plan comparisons, regional quotes, household shares, notes, and history remain available in context. Cancellation confirmation is a separate, explicit action after the user checks the provider's outcome.
 
-1. The user opens **Home**.
-2. The first card identifies the next upcoming charge or trial deadline.
-3. The user taps the card to open the subscription detail.
-4. The user adjusts the reminder or selects **Manage officially**.
+### Insights and Settings
 
-### Reach the official management page
+Insights is a per-currency report: monthly equivalent, category allocation, forecast, review candidates, price changes, budget position, and manually recorded savings. Savings entry and history open in sheets, rather than remaining forms inside the report.
 
-1. The user opens a subscription detail.
-2. The user taps **Manage officially**.
-3. The app shows the billing authority and explains that only that authority can cancel or change the subscription.
-4. The user taps **Open official page**.
-5. On return, the user may mark the record as active, cancelled, changed, or uncertain; the app never infers cancellation success.
+Settings contains a searchable country/currency selector, focused budget editor, appearance, Android reminders, privacy, backup/calendar export, household access, optional cloud accounts, and reset. Product strategy and deployment instructions do not belong in the interface.
 
-### Compare plans before buying or changing
+## Launch experience
 
-1. The user opens a service detail from Discover or an existing subscription.
-2. The user taps **Compare plans**.
-3. The user reviews tier-by-tier cards with indicative pricing and concise differences.
-4. The user returns to add or edit their own actual subscription record.
+Native splash and the React launch screen use the same emerald mark and background. The savings tagline is:
 
-### Organize a shared household plan
+**Spend on what matters. Save the rest.**
 
-1. The user opens **Settings** and selects **Shared plans**.
-2. The user adds local household members such as a partner or family member.
-3. The user opens an existing subscription’s full edit screen and selects who shares it.
-4. The Household screen divides the saved monthly estimate equally between selected people.
-5. The user can remove a member locally; SubTrack removes that person from local shared-plan allocations without contacting any external service.
+The mark enters softly with a restrained pulse on every fresh app launch. Its 1,600 ms visible introduction starts only after fonts finish or fail, the launch view lays out, and the static native splash has been hidden. Two paint frames precede the animation clock. The native splash itself has no fade that could cover the introduction. Reduced motion removes the intro wait and entrance/pulse/fade animations.
 
-## Interaction principles
+The overlay waits for font completion (or a font error), local data readiness (or a recoverable storage error), and privacy readiness. Underlying screens are hidden while the overlay is visible. A locked app still requires device authentication; a privacy read failure offers Retry rather than displaying records.
 
-All high-frequency actions are placed within thumb reach: the persistent tab bar, the floating add button on list-based screens, and the primary action at the bottom of detail screens. Forms use simple pickers and segmented controls rather than free-text wherever a bounded selection is available. Destructive actions require confirmation, and official-link actions explain the destination before leaving the app.
+## Financial and privacy boundaries
 
-The MVP uses local storage. It does not request bank, inbox, or provider-password access; therefore onboarding can be lightweight and transparent.
+- Never combine or convert different currencies. Prefer the chosen country's currency, including an honest zero total if no records use it. Without a country choice, preserve the existing budget-currency preference when it is present in active records.
+- Country changes set defaults for new entries, not existing prices. Existing nonzero budgets keep their own currency; an unset budget adopts the chosen currency.
+- Monthly/yearly equivalents are estimates, not charges already paid. Remaining-month totals use actual projected billing dates.
+- Attention is ordered by decision deadline. Overdue trial checks and cancellation follow-ups on archived records remain visible.
+- Amounts, renewal settings, usage check-ins, and provider outcomes come from user records. No bank, inbox, or provider account is monitored.
+- Savings are manually recorded refunds or avoided charges, not automatically claimed benefits.
+- Preserve queued, validated local storage, recovery snapshots, cloud conflict protection, and reminder behavior.
+- Hide amounts protects formatted summaries, not editable forms, notes, receipts, shared-plan fields, or exports. Storage and exported backups are not encrypted.
 
-## Production redesign direction
+## Validation
 
-The production redesign abandons decorative hero treatments and generic finance-dashboard conventions. The Home screen becomes a **renewal command center**: it starts with the next decision the user needs to make, moves into a compact monthly run-rate and charge-date view, and ends with a concise subscription ledger. This mirrors the actual reason people open SubTrack—understanding what is due, whether it is still worthwhile, and where to act—rather than over-emphasising a single aggregate total.
+Run `pnpm check`, `pnpm test`, `pnpm lint`, web export, and Android bundle export. Test empty/populated, mixed-currency, trial, archived, overdue follow-up, malformed input, reduced-motion, and storage-error states. Check narrow phones, a normal phone, and desktop in both themes.
 
-| Design decision | Production behaviour |
-|---|---|
-| Primary hierarchy | Surface the nearest renewal or trial first, with one direct review action. |
-| Monthly context | Show the current run rate alongside a compact chronological charge strip rather than a decorative chart. |
-| Subscription records | Use a dense but legible ledger: service mark, plan, renewal date, amount, and a slim urgency rail. |
-| Navigation | Retain the four stable destinations, but use restrained typography, line icons, and one clear active indicator. |
-| Visual language | Use a neutral, low-glare environment with semantically limited vermilion for urgency, cobalt-lilac for navigation, and green only for confirmed positive status. |
-
-This direction is designed for one-handed portrait use. The home screen’s immediate action, next charges, and record list are all reachable without a visual “hero” competing for attention. Both themes must preserve this hierarchy through relative contrast rather than merely inverting a palette.
+An exported JavaScript bundle is not an installed APK. Android notifications, authentication, widget refresh, and native OCR still require physical-device checks.

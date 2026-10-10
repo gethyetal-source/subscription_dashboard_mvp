@@ -7,6 +7,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "r
 import { PrimaryButton, SecondaryButton } from "@/components/subscription-ui";
 import { ScreenContainer } from "@/components/screen-container";
 import { billingSourceMeta, getService } from "@/lib/catalog";
+import { defaultCurrency } from "@/lib/countries";
 import { useSubscriptions } from "@/lib/subscription-store";
 import type { BillingSource, ChargePaymentRail } from "@/lib/subscription-types";
 import { getChargeRecognitionMatches, getChargeRecognitionSupportCopy, isValidDateString, resolveManagementUrl } from "@/lib/subscription-utils";
@@ -17,10 +18,10 @@ type WorksheetRow = { id: string; kind: "heading"; title: string } | { id: strin
 const baseStyles = () => styles;
 export default function ChargeRecognitionScreen() {
   const styles = useThemedStyles(baseStyles());
-  const { subscriptions, chargeRecognitionCases, saveChargeRecognitionCase, deleteChargeRecognitionCase } = useSubscriptions();
+  const { subscriptions, settings, chargeRecognitionCases, saveChargeRecognitionCase, deleteChargeRecognitionCase } = useSubscriptions();
   const [merchantLabel, setMerchantLabel] = useState("");
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState(defaultCurrency(settings));
   const [chargeDate, setChargeDate] = useState("");
   const [billingSource, setBillingSource] = useState<BillingSource>("unknown");
   const [paymentRail, setPaymentRail] = useState<ChargePaymentRail>("unknown");

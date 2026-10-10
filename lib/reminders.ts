@@ -7,6 +7,24 @@ import { getService } from "@/lib/catalog";
 import type { ReminderPermissionState } from "@/lib/reminder-utils";
 import { buildReminderPlans } from "@/lib/renewal-engine";
 
+let accountReminderTail: Promise<unknown> = Promise.resolve();
+export function serializeAccountReminders<T>(operation: () => Promise<T>): Promise<T> {
+  const result = accountReminderTail.catch(() => undefined).then(operation);
+  accountReminderTail = result;
+  return result;
+}
+
+export async function suspendRenewalReminders() {
+  if (Platform.OS === "web") return;
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  await Promise.all(scheduled.filter((item) => typeof item.content.data?.subscriptionId === "string")
+    .map((item) => cancelRenewalReminder(item.identifier)));
+  const delivered = await Notifications.getPresentedNotificationsAsync();
+  await Promise.all(delivered.filter((item) => typeof item.request.content.data?.subscriptionId === "string")
+    .map((item) => Notifications.dismissNotificationAsync(item.request.identifier)));
+  await Notifications.clearLastNotificationResponseAsync();
+}
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,

@@ -9,7 +9,6 @@ describe("Play Store preparation", () => {
   it("keeps the account-deletion function authenticated and scoped to the requesting user", () => {
     const source = read("supabase/functions/delete-subtrack-account/index.ts");
     expect(source).toContain("caller.auth.getUser()");
-    expect(source).toContain('delete().eq("user_id", user.id)');
     expect(source).toContain("admin.auth.admin.deleteUser(user.id)");
     expect(source).not.toContain("request.json");
   });
@@ -17,6 +16,7 @@ describe("Play Store preparation", () => {
   it("includes Play-compatible Android bundle and internal APK build profiles", () => {
     const config = JSON.parse(read("eas.json"));
     expect(config.build.preview.android.buildType).toBe("apk");
+    expect(config.build.preview.autoIncrement).toBe(true);
     expect(config.build.production.android.buildType).toBe("app-bundle");
     expect(config.build.production.autoIncrement).toBe(true);
   });
@@ -32,10 +32,11 @@ describe("Play Store preparation", () => {
     expect(routes).toContain('name="delete-account"');
   });
 
-  it("keeps the privacy route transparent about local data, optional cloud sync, and deletion", () => {
+  it("keeps the privacy route transparent about local-only data, account sign-in, and deletion", () => {
     const source = read("app/privacy-policy.tsx");
-    expect(source).toContain("stored locally on the device by default");
-    expect(source).toContain("Optional cloud sync");
+    expect(source).toContain("stored locally on the device only");
+    expect(source).toContain("Account sign-in");
+    expect(source).toContain("They are not uploaded to Supabase");
     expect(source).toContain("Account deletion");
   });
 });

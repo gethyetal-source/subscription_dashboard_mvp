@@ -12,7 +12,8 @@ export function addBillingPeriod(anchor: string, cadence: BillingCadence, period
   return dateKey(target);
 }
 export function billingOccurrences(record: SubscriptionRecord, from: string, through: string, max = 1000) {
-  if (record.status === "cancelled") return [];
+  if (record.status === "cancelled" || max <= 0) return [];
+  if (record.autoRenewStatus === "off") return record.renewalDate >= from && record.renewalDate <= through ? [record.renewalDate] : [];
   const result: string[] = [];
   let period = 0;
   // Jump near the requested range while retaining the original month-end anchor.
@@ -25,7 +26,6 @@ export function billingOccurrences(record: SubscriptionRecord, from: string, thr
     const due = addBillingPeriod(record.renewalDate, record.cadence, period);
     if (due > through) break;
     if (due >= from) result.push(due);
-    if (record.autoRenewStatus === "off") break;
   }
   return result;
 }

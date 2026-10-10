@@ -13,11 +13,12 @@ interface PrivacyValue {
   setAppLockEnabled(value: boolean): Promise<void>;
 }
 const PrivacyContext = createContext<PrivacyValue | undefined>(undefined);
-export function PrivacyProvider({ children }: PropsWithChildren) {
+export function PrivacyProvider({ children, onReady }: PropsWithChildren<{ onReady?: () => void }>) {
   const [preferences, setPreferences] = useState({ hideAmounts: false, appLockEnabled: false });
   const [loaded, setLoaded] = useState(false);
   const [locked, setLocked] = useState(false);
   const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
   const authenticating = useRef(false);
   const colors = usePalette();
   useEffect(() => {
@@ -32,7 +33,8 @@ export function PrivacyProvider({ children }: PropsWithChildren) {
       setPreferences(saved); setLocked(saved.appLockEnabled); setLoaded(true);
     }).catch(() => { if (mounted) { setError("Privacy preferences could not be loaded. Reopen the app to retry."); } });
     return () => { mounted = false; };
-  }, []);
+  }, [retry]);
+  useEffect(() => { if (loaded || error) onReady?.(); }, [loaded, error, onReady]);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       // The system authentication prompt can report "inactive"; leaving for the background must always re-lock.
@@ -65,7 +67,8 @@ export function PrivacyProvider({ children }: PropsWithChildren) {
   return <PrivacyContext.Provider value={value}>
     {!loaded || locked ? <View style={{ flex: 1, justifyContent: "center", padding: 24, backgroundColor: colors.background }}>
       <Card title={loaded ? "SubTrack is locked" : "Loading privacy preferences"}>
-        <Copy>{error || "Your subscriptions are private. Authenticate to continue."}</Copy>
+        <Copy>{error || (loaded ? "Your subscriptions are private. Authenticate to continue." : "Preparing your private space…")}</Copy>
+        {!loaded && error ? <Button label="Retry" onPress={() => { setError(""); setRetry((value) => value + 1); }} /> : null}
         {loaded ? <Button label="Unlock with device authentication" onPress={() => {
           if (authenticating.current) return;
           void authenticate().then(() => { setLocked(false); setError(""); }).catch((reason) => setError(reason.message));

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Platform, Switch } from "react-native";
-import { Button, Card, Copy, Page } from "@/components/app-ui";
+import { Platform } from "react-native";
+import { Button, Card, Copy, Page, ToggleRow } from "@/components/app-ui";
 import { usePrivacy } from "@/lib/privacy";
 import { router } from "expo-router";
 
@@ -14,14 +14,14 @@ export default function PrivacyControlsScreen() {
     catch (error) { setMessage(error instanceof Error ? error.message : "Could not save privacy preference."); }
     finally { setBusy(false); }
   };
-  return <Page title="Privacy controls" subtitle="Device preferences are never included in cloud backups.">
+  return <Page title="Privacy controls" subtitle="These preferences apply only to this device.">
     <Card title="Hide financial amounts">
-      <Copy>Hide formatted spending amounts in summaries and the home-screen widget. Editing forms, original notes, receipts, exports, and shared cloud records still contain your data.</Copy>
-      <Switch accessibilityLabel="Hide financial amounts" disabled={busy} value={privacy.hideAmounts} onValueChange={(value) => void run(() => privacy.setHideAmounts(value))} />
+      <Copy muted>Hide amounts in summaries and the widget. Forms, notes, receipts, shared plans, and exports still contain your amounts.</Copy>
+      <ToggleRow label="Hide amounts" disabled={busy} value={privacy.hideAmounts} onChange={(value) => void run(() => privacy.setHideAmounts(value))} />
     </Card>
     <Card title="App lock">
-      <Copy>Require device authentication when returning to the Android app. This is a screen lock, not encryption of AsyncStorage, downloaded files, or backups.</Copy>
-      {Platform.OS === "android" ? <Switch accessibilityLabel="Enable app lock" disabled={busy} value={privacy.appLockEnabled} onValueChange={(value) => void run(() => privacy.setAppLockEnabled(value))} /> : <Copy muted>App lock is unavailable on the website. Use your browser and operating-system security controls.</Copy>}
+      <Copy muted>Require device authentication when you return to the app. Stored data and backup files are not encrypted.</Copy>
+      {Platform.OS === "android" ? <ToggleRow label="App lock" disabled={busy} value={privacy.appLockEnabled} onChange={(value) => void run(() => privacy.setAppLockEnabled(value))} /> : <Copy muted>App lock is available on Android only.</Copy>}
     </Card>
     <Button label="Backup, restore, and recovery" secondary onPress={() => router.push("/backup" as never)} />
     <Button label="Account and data deletion" secondary onPress={() => router.push("/delete-account")} />

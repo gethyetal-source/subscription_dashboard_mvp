@@ -158,6 +158,7 @@ export interface AppSettings {
   dashboardSort: DashboardSort;
   monthlyBudget: number;
   budgetCurrency?: string;
+  countryCode?: string;
   onboardingCompleted?: boolean;
 }
 

@@ -1,34 +1,44 @@
 import { router } from "expo-router";
-import { useState } from "react";
-import * as WebBrowser from "expo-web-browser";
-import { Button, Card, Copy, Page } from "@/components/app-ui";
-import { useSubscriptions } from "@/lib/subscription-store";
+import { Pressable, Text, View } from "react-native";
+import { Button } from "@/components/app-ui";
+import { EmptyIllustration, FinancePage, MetricLabel, SectionHeading, Surface, financeType } from "@/components/finance-ui";
+import { ServiceBadge } from "@/components/subscription-ui";
+import { deadlineLabel, financeAttention, groupPayments, subscriptionName } from "@/lib/finance-overview";
 import { useMoneyFormatter } from "@/lib/privacy";
-import { getService } from "@/lib/catalog";
-import { billingOccurrences, addBillingPeriod } from "@/lib/renewal-engine";
-import { localDateKey, resolveManagementUrl } from "@/lib/subscription-utils";
+import { getRenewalQueue } from "@/lib/renewal-queue";
+import { useSubscriptions } from "@/lib/subscription-store";
+import { localDateKey } from "@/lib/subscription-utils";
+import { usePalette } from "@/lib/ui-theme";
 
-export default function RenewalCenter() {
-  const store = useSubscriptions(); const money = useMoneyFormatter();
-  const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
-  const today = localDateKey();
-  const queue = store.subscriptions.filter((record) => record.status !== "cancelled").map((record) => ({
-    record, due: record.status === "trial" && record.trialEndDate ? record.trialEndDate : billingOccurrences(record, today, addBillingPeriod(today, "yearly"), 1)[0] ?? record.renewalDate,
-  })).sort((a, b) => a.due.localeCompare(b.due));
-  return <Page title="Renewal action center" subtitle="Keep, review, or open official management. Decisions here never change a provider account.">
-    <Button label="Quick add subscription" onPress={() => router.push("/quick-add" as never)} />
-    {queue.length ? queue.map(({ record, due }) => <Card key={record.id} title={getService(record.serviceId)?.name ?? record.planName}>
-      <Copy>{record.status === "trial" ? "Trial ends" : "Next projected renewal"}: {due} · {money(record.expectedNextCharge ?? record.amount, record.currency)}</Copy>
-      <Copy muted>Decision: {record.renewalDecisionPlan?.action.replace(/-/g, " ") ?? "Not recorded"}</Copy>
-      <Button label="Keep for this renewal" secondary disabled={busy} onPress={() => {
-        setBusy(true);
-        void store.updateDecisionSupport(record.id, { renewalDecisionPlan: { action: "keep", decidedAt: new Date().toISOString() }, intentTags: record.intentTags, valueCheckIn: record.valueCheckIn })
-          .catch(() => setMessage("Could not save the decision.")).finally(() => setBusy(false));
-      }} />
-      <Button label="Review value and renewal decision" secondary onPress={() => router.push({ pathname: "/decision-plan", params: { id: record.id } } as never)} />
-      <Button label="Open official management page" secondary onPress={() => void WebBrowser.openBrowserAsync(resolveManagementUrl(record)).catch(() => setMessage("Could not open the provider page."))} />
-      <Button label="Details and cancellation follow-up" secondary onPress={() => router.push(`/subscription/${record.id}` as never)} />
-    </Card>) : <Card title="No active subscriptions"><Copy>Add your first subscription to see upcoming charges.</Copy></Card>}
-    {message ? <Copy>{message}</Copy> : null}
-  </Page>;
+export default function RenewalsScreen() {
+  const store = useSubscriptions();
+  const money = useMoneyFormatter();
+  const colors = usePalette();
+  const queue = getRenewalQueue(store.subscriptions);
+  const attention = financeAttention(store.subscriptions);
+  const groups = groupPayments(queue.filter((item) => item.kind !== "cancellation" && item.due >= localDateKey()));
+  const otherFollowUps = queue.filter((item) => item.kind === "cancellation" && !attention.some((attentionItem) => attentionItem.record.id === item.record.id && attentionItem.kind === "cancellation"));
+  return <FinancePage title="Renewals">
+    {attention.length ? <View style={{ gap: 12 }}>
+      <SectionHeading title="Needs attention" />
+      {attention.map((item) => <Pressable key={`${item.record.id}-${item.reason}`} accessibilityRole="button" accessibilityLabel={`Review ${subscriptionName(item.record)}`} onPress={() => router.push(`/subscription/${item.record.id}` as never)} style={({ pressed }) => ({ flexDirection: "row", gap: 12, padding: 16, borderRadius: 18, alignItems: "center", backgroundColor: colors.elevated, opacity: pressed ? 0.7 : 1 })}>
+        <ServiceBadge serviceId={item.record.serviceId} label={item.record.planName} />
+        <View style={{ flex: 1 }}><Text style={{ color: colors.foreground, fontFamily: financeType.semi, fontSize: 14 }}>{subscriptionName(item.record)}</Text><Text style={{ color: colors.warning, fontFamily: financeType.regular, fontSize: 11, marginTop: 4 }}>{item.reason === "cancellation" ? "Cancellation follow-up" : item.reason === "trial" ? "Trial ends" : "Review renewal"} · {deadlineLabel(item.due)}</Text></View>
+        <Text style={{ color: colors.primary, fontSize: 20 }}>›</Text>
+      </Pressable>)}
+    </View> : null}
+    {groups.length ? <View style={{ gap: 16 }}>
+      <SectionHeading title="Payment timeline" />
+      {groups.map((group) => <View key={group.date} style={{ gap: 8 }}>
+        <MetricLabel>{deadlineLabel(group.date)}</MetricLabel>
+        <Surface>{group.payments.map((item) => <Pressable key={item.record.id} accessibilityRole="button" accessibilityLabel={`View ${subscriptionName(item.record)}`} onPress={() => router.push(`/subscription/${item.record.id}` as never)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8, opacity: pressed ? 0.7 : 1 })}>
+          <ServiceBadge serviceId={item.record.serviceId} label={item.record.planName} />
+          <View style={{ flex: 1, minWidth: 0 }}><Text numberOfLines={1} style={{ color: colors.foreground, fontFamily: financeType.medium, fontSize: 14 }}>{subscriptionName(item.record)}</Text><Text style={{ color: colors.muted, fontFamily: financeType.regular, fontSize: 11, marginTop: 3 }}>{item.kind === "trial" ? "Expected after trial" : `${item.record.cadence} payment`}</Text></View>
+          <Text style={{ color: colors.foreground, fontFamily: financeType.semi, fontSize: 13, maxWidth: "42%", textAlign: "right" }}>{money(item.record.expectedNextCharge ?? item.record.amount, item.record.currency)}</Text>
+        </Pressable>)}</Surface>
+      </View>)}
+      <MetricLabel>Next saved payment for each plan. Future recurring payments are estimates.</MetricLabel>
+    </View> : !attention.length && !otherFollowUps.length ? <EmptyIllustration title="Nothing coming up." body="Your next payments and trial deadlines will appear here." action={<Button label="Add a subscription" onPress={() => router.push("/quick-add")} />} /> : null}
+    {otherFollowUps.map((item) => <Pressable key={`${item.record.id}-followup`} accessibilityRole="button" accessibilityLabel={`Cancellation follow-up for ${subscriptionName(item.record)}`} onPress={() => router.push(`/subscription/${item.record.id}` as never)} style={{ padding: 16, borderRadius: 18, backgroundColor: colors.elevated, gap: 5 }}><Text style={{ color: colors.foreground, fontFamily: financeType.medium, fontSize: 14 }}>{subscriptionName(item.record)}</Text><MetricLabel>Cancellation follow-up · {deadlineLabel(item.due)}</MetricLabel></Pressable>)}
+  </FinancePage>;
 }

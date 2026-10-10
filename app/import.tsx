@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 import { router } from "expo-router";
 import { Button, Card, Copy, Field, Page } from "@/components/app-ui";
 import { chooseTextFile } from "@/lib/file-transfer";
+import { defaultCurrency } from "@/lib/countries";
 import { importTransactions, suggestReceiptFields, type ImportedCharge } from "@/lib/import-utils";
 import { recognizeReceipt } from "@/lib/receipt-recognition";
 import { useSubscriptions } from "@/lib/subscription-store";
@@ -11,7 +12,7 @@ import { useMoneyFormatter } from "@/lib/privacy";
 
 export default function ImportScreen() {
   const store = useSubscriptions(); const money = useMoneyFormatter();
-  const [text, setText] = useState(""); const [currency, setCurrency] = useState("USD");
+  const [text, setText] = useState(""); const [currency, setCurrency] = useState(defaultCurrency(store.settings));
   const [charges, setCharges] = useState<ImportedCharge[]>([]); const [saved, setSaved] = useState<number[]>([]);
   const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   const run = async (operation: () => Promise<void>) => {
@@ -19,10 +20,10 @@ export default function ImportScreen() {
     try { await operation(); } catch (error) { setMessage(error instanceof Error ? error.message : "Import failed."); } finally { setBusy(false); }
   };
   const suggestion = suggestReceiptFields(text);
-  return <Page title="Private import" subtitle="Nothing is saved until you review and confirm it. No bank login, inbox access, or cloud OCR.">
+  return <Page title="Import" subtitle="Review every suggestion before saving.">
     <Card title="Receipt or screenshot">
-      <Copy muted>{Platform.OS === "web" ? "Recognition runs in your browser. The OCR worker and English model may be downloaded on first use; your image stays in the browser." : "Recognition runs on this Android device. A new APK is required for the native OCR module."}</Copy>
-      <Button label={busy ? "Processing…" : "Choose image and recognize locally"} disabled={busy} onPress={() => void run(async () => {
+      <Copy muted>{Platform.OS === "web" ? "Your image stays in this browser. First use needs an internet connection to download recognition files." : "Your image is read on this device, not uploaded."}</Copy>
+      <Button label={busy ? "Reading image…" : "Choose receipt image"} disabled={busy} onPress={() => void run(async () => {
         const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1, base64: false });
         if (!result.canceled) {
           if (result.assets[0].fileSize && result.assets[0].fileSize > 10_000_000) throw new Error("Choose an image smaller than 10 MB.");

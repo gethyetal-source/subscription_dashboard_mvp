@@ -58,6 +58,18 @@ export function getCloudAuthErrorMessage(error: unknown) {
   if (combined.includes("email_address_invalid") || combined.includes("invalid email")) {
     return "Enter a valid email address, then try again.";
   }
+  if (combined.includes("provider is not enabled") || combined.includes("unsupported provider")) {
+    return "Google sign-in is not available yet. Use email and password, or try again later.";
+  }
+  if (combined.includes("access_denied")) {
+    return "Google sign-in was cancelled or not approved. Try again when you are ready.";
+  }
+  if (combined.includes("code verifier") || combined.includes("pkce") || combined.includes("flow state")) {
+    return "This sign-in link cannot be completed here. Open the newest link in the same browser or device where you started, or sign in again.";
+  }
+  if (combined.includes("weak_password") || combined.includes("password")) {
+    return "Choose a stronger password with at least 8 characters.";
+  }
   return "We could not complete that account action. Check your connection and try again.";
 }
 

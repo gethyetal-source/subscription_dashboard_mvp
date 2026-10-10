@@ -3,8 +3,8 @@ import { useThemeContext } from "./theme-provider";
 import { SchemeColors } from "@/constants/theme";
 
 export const palettes = {
-  light: { ...SchemeColors.light, elevated: "#EAEADE", onPrimary: "#FFFFFF", danger: SchemeColors.light.error },
-  dark: { ...SchemeColors.dark, elevated: "#202713", onPrimary: "#172108", danger: SchemeColors.dark.error },
+  light: { ...SchemeColors.light, elevated: "#EDF6F1", onPrimary: "#FFFFFF", danger: SchemeColors.light.error },
+  dark: { ...SchemeColors.dark, elevated: "#20372F", onPrimary: "#0D2B22", danger: SchemeColors.dark.error },
 };
 export function usePalette() { return palettes[useThemeContext().colorScheme]; }
 export function useThemedStyles<T>(styles: T): T {
@@ -29,6 +29,10 @@ export function useThemedStyles<T>(styles: T): T {
       "#2B2519": palette.elevated, "#3D3520": palette.elevated,
       "#887330": palette.border, "#D2E3FC": palette.border,
       "#C8CEBC": palette.muted, "#D7DBC9": palette.muted, "#174EA6": palette.primary,
+      "#E4E8D6": palette.foreground, "#F4D5CD": palette.muted,
+      "#FFD2C8": palette.warning, "#FFB5A7": palette.warning, "#FFD5A8": palette.warning,
+      "#3B2519": palette.elevated, "#815342": palette.border, "#536238": palette.border,
+      "#C59050": palette.warning, "#FF8A7A": palette.danger,
     };
     // Legacy white text sits on accents that are remapped to palette.primary, so it must follow onPrimary.
     // Text on unmapped accent colors (service badges, member avatars) uses the literal "white" instead.

@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { router } from "expo-router";
 import { Button, Card, Copy, Field, Page } from "@/components/app-ui";
+import { defaultCurrency } from "@/lib/countries";
 import { useSubscriptions } from "@/lib/subscription-store";
 import { requestReminderPermission } from "@/lib/reminders";
 
 export default function OnboardingScreen() {
   const store = useSubscriptions();
   const [budget, setBudget] = useState(store.settings.monthlyBudget ? String(store.settings.monthlyBudget) : "");
-  const [currency, setCurrency] = useState(store.settings.budgetCurrency ?? "USD");
+  const [currency, setCurrency] = useState(store.settings.monthlyBudget > 0 ? store.settings.budgetCurrency ?? "USD" : defaultCurrency(store.settings));
   const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   const finish = async (add: boolean) => {
     setBusy(true);

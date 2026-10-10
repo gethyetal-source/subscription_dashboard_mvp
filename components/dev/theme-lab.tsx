@@ -24,7 +24,7 @@ function ColorSwatch({ name, value }: { name: PaletteName; value: string }) {
   );
 }
 
-export default function ThemeLabScreen() {
+export default function ThemeLabPreview() {
   const [pressCount, setPressCount] = useState(0);
   const [lastAction, setLastAction] = useState<string>("None yet");
   const { colorScheme, setColorScheme } = useThemeContext();

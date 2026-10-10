@@ -11,8 +11,8 @@ const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Popp
 const baseStyles = () => styles;
 export default function CatalogCorrectionScreen() {
   const styles = useThemedStyles(baseStyles());
-  const { saveCatalogCorrectionRequest } = useSubscriptions();
-  const [serviceName, setServiceName] = useState(""); const [country, setCountry] = useState("IN"); const [planName, setPlanName] = useState(""); const [observedPrice, setObservedPrice] = useState(""); const [sourceUrl, setSourceUrl] = useState(""); const [note, setNote] = useState(""); const [saving, setSaving] = useState(false);
+  const { settings, saveCatalogCorrectionRequest } = useSubscriptions();
+  const [serviceName, setServiceName] = useState(""); const [country, setCountry] = useState(settings.countryCode ?? ""); const [planName, setPlanName] = useState(""); const [observedPrice, setObservedPrice] = useState(""); const [sourceUrl, setSourceUrl] = useState(""); const [note, setNote] = useState(""); const [saving, setSaving] = useState(false);
   const save = async () => {
     if (!serviceName.trim() || !country.trim()) return Alert.alert("Add the service and country", "Include a service name and a two-letter country code so the local draft has useful context.");
     if (sourceUrl.trim() && !/^https:\/\//i.test(sourceUrl.trim())) return Alert.alert("Use an official HTTPS link", "Add the provider’s official page beginning with https://, or leave the link blank.");

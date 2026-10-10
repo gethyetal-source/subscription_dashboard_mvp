@@ -45,7 +45,7 @@ const config: ExpoConfig = {
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: env.scheme,
+  scheme: [env.scheme, "subtrack"],
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {
@@ -72,6 +72,10 @@ const config: ExpoConfig = {
         action: "VIEW",
         autoVerify: false,
         data: [
+          {
+            scheme: "subtrack",
+            host: "*",
+          },
           {
             scheme: env.scheme,
             host: "*",
@@ -122,12 +126,12 @@ const config: ExpoConfig = {
     [
       "expo-splash-screen",
       {
-        image: "./assets/images/splash-icon.png",
-        imageWidth: 200,
+        image: "./assets/images/emerald-splash.png",
+        imageWidth: 76,
         resizeMode: "contain",
-        backgroundColor: "#11150B",
+        backgroundColor: "#073A2E",
         dark: {
-          backgroundColor: "#11150B",
+          backgroundColor: "#073A2E",
         },
       },
     ],

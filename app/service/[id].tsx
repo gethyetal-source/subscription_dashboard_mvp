@@ -1,28 +1,43 @@
+import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { useThemedStyles } from "@/lib/ui-theme";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
+import { Button, Copy, Notice } from "@/components/app-ui";
+import { Disclosure, FinanceLink, FinancePage, SectionHeading, Surface, financeType } from "@/components/finance-ui";
+import { ServiceBadge } from "@/components/subscription-ui";
+import { getService } from "@/lib/catalog";
+import { usePalette } from "@/lib/ui-theme";
 
-import { Pill, PrimaryButton, SecondaryButton, ServiceBadge } from "@/components/subscription-ui";
-import { getCatalogPriceGuidance, getCatalogPriceSignal, getService } from "@/lib/catalog";
-import { ScreenContainer } from "@/components/screen-container";
-
-const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
-
-const baseStyles = () => styles;
 export default function ServiceDetailScreen() {
-  const styles = useThemedStyles(baseStyles());
-  const { id } = useLocalSearchParams<{ id: string }>(); const service = getService(id);
-  if (!service) return <ScreenContainer className="p-5"><Text style={styles.missing}>This service is not available in the catalog.</Text></ScreenContainer>;
-  return <ScreenContainer className="px-5" containerClassName="bg-background"><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-    <View style={styles.nav}><Pressable onPress={() => router.back()} hitSlop={10}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.navTitle}>Service details</Text><View style={{ width: 26 }} /></View>
-    <View style={styles.hero}><ServiceBadge serviceId={service.id} size="large" /><View style={{ flex: 1 }}><Pill label={service.category} tone="neutral" /><Text style={styles.title}>{service.name}</Text><Text style={styles.description}>{service.description}</Text></View></View>
-    <View style={styles.notice}><Text style={styles.noticeTitle}>Plan details are reference information</Text><Text style={styles.noticeBody}>Catalog labels are not live provider billing data. Prices, taxes, availability, and features can differ by country, platform, and eligibility.</Text><Pressable onPress={() => void WebBrowser.openBrowserAsync(service.officialUrl)} style={({ pressed }) => [styles.officialPriceAction, pressed && styles.pressed]}><Text style={styles.officialPriceActionText}>Check official price</Text></Pressable></View>
-    <View style={styles.sectionRow}><Text style={styles.section}>Plan options</Text><Pressable onPress={() => router.push(`/compare/${service.id}`)}><Text style={styles.textAction}>Compare</Text></Pressable></View>
-    <View style={styles.planList}>{service.plans.map((plan) => <View key={plan.id} style={styles.plan}><View style={styles.planTop}><View style={{ flex: 1 }}><Text style={styles.planName}>{plan.name}</Text><Text style={styles.planSummary}>{plan.summary}</Text></View><Text style={styles.price}>{plan.priceLabel}</Text></View><Text style={[styles.priceGuidance, getCatalogPriceSignal(plan.priceLabel) !== "reference" && styles.priceGuidanceAlert]}>{getCatalogPriceGuidance(plan.priceLabel)}</Text><View style={styles.featureList}>{plan.features.slice(0, 3).map((feature) => <View key={feature} style={styles.feature}><Text style={styles.featureDot}>•</Text><Text style={styles.featureText}>{feature}</Text></View>)}</View></View>)}</View>
-    <SecondaryButton label="Compare plan options" onPress={() => router.push(`/compare/${service.id}`)} />
-    <PrimaryButton label="Add to my subscriptions" onPress={() => router.push(`/subscription/edit?serviceId=${service.id}` as never)} />
-    <Pressable onPress={() => Alert.alert("Official management", service.managementHint)}><Text style={styles.help}>Already subscribed? Add your record to access guidance for the official management page.</Text></Pressable>
-  </ScrollView></ScreenContainer>;
+  const colors = usePalette();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const service = getService(id);
+  const [information, setInformation] = useState(false);
+  const [error, setError] = useState("");
+  if (!service) return <FinancePage title="Service"><Copy muted>This service is not in the catalog.</Copy></FinancePage>;
+  return <FinancePage title="Service plans">
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+      <ServiceBadge serviceId={service.id} size="large" />
+      <View style={{ flex: 1 }}><Text style={{ color: colors.foreground, fontFamily: financeType.bold, fontSize: 25 }}>{service.name}</Text><Text style={{ color: colors.muted, fontFamily: financeType.regular, fontSize: 12, marginTop: 3 }}>{service.category}</Text></View>
+    </View>
+    <Copy muted>{service.description}</Copy>
+    <Button label="Add my subscription" onPress={() => router.push({ pathname: "/quick-add", params: { serviceId: service.id, name: service.name } })} />
+    <View style={{ gap: 12 }}>
+      <SectionHeading title="Plan options" action="Compare" onPress={() => router.push(`/compare/${service.id}`)} />
+      {service.plans.map((plan) => <Surface key={plan.id}>
+        <Text style={{ color: colors.foreground, fontFamily: financeType.semi, fontSize: 17 }}>{plan.name}</Text>
+        <Text style={{ color: colors.primary, fontFamily: financeType.medium, fontSize: 13 }}>{plan.priceLabel}</Text>
+        <Text style={{ color: colors.muted, fontFamily: financeType.regular, fontSize: 12, lineHeight: 20 }}>{plan.summary}</Text>
+        {plan.features.slice(0, 3).map((feature) => <Text key={feature} style={{ color: colors.foreground, fontFamily: financeType.regular, fontSize: 12, lineHeight: 19 }}>• {feature}</Text>)}
+      </Surface>)}
+      <Text style={{ color: colors.muted, fontFamily: financeType.regular, fontSize: 11, lineHeight: 19 }}>Reference prices, not live quotes. Your country, tax, billing platform, or offer may change what you pay.</Text>
+      <FinanceLink icon="open-outline" title="Check official prices" onPress={() => void WebBrowser.openBrowserAsync(service.officialUrl).catch(() => setError("Could not open the provider page."))} />
+    </View>
+    <Disclosure title="More plan information" open={information} onToggle={() => setInformation(!information)}>
+      <FinanceLink icon="globe-outline" title="Compare regional prices" onPress={() => router.push({ pathname: "/regional-plans", params: { serviceId: service.id } })} />
+      <FinanceLink icon="create-outline" title="Suggest a catalog correction" onPress={() => router.push({ pathname: "/catalog-correction", params: { serviceId: service.id } })} />
+      <Copy muted>{service.managementHint}</Copy>
+    </Disclosure>
+    {error ? <Notice error>{error}</Notice> : null}
+  </FinancePage>;
 }
-const styles = StyleSheet.create({ content: { gap: 16, paddingBottom: 30, paddingTop: 12 }, nav: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, back: { color: "#3C4043", fontFamily: type.regular, fontSize: 34, lineHeight: 34 }, navTitle: { color: "#3C4043", fontFamily: type.semi, fontSize: 13 }, hero: { alignItems: "flex-start", flexDirection: "row", gap: 14, paddingTop: 6 }, title: { color: "#202124", fontFamily: type.bold, fontSize: 24, letterSpacing: -0.7, marginTop: 8 }, description: { color: "#5F6368", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 4 }, notice: { backgroundColor: "#FEF7E0", borderRadius: 14, padding: 14 }, noticeTitle: { color: "#7A4700", fontFamily: type.semi, fontSize: 12 }, noticeBody: { color: "#66521F", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 4 }, officialPriceAction: { alignSelf: "flex-start", justifyContent: "center", marginTop: 9, minHeight: 30 }, officialPriceActionText: { color: "#8A5200", fontFamily: type.semi, fontSize: 11 }, sectionRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginTop: 2 }, section: { color: "#202124", fontFamily: type.semi, fontSize: 17 }, textAction: { color: "#1A73E8", fontFamily: type.semi, fontSize: 13 }, planList: { gap: 10 }, plan: { backgroundColor: "#FFFFFF", borderColor: "#DADCE0", borderRadius: 16, borderWidth: 1, padding: 14 }, planTop: { flexDirection: "row", gap: 10, justifyContent: "space-between" }, planName: { color: "#202124", fontFamily: type.semi, fontSize: 14 }, planSummary: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, lineHeight: 16, marginTop: 3 }, price: { color: "#1967D2", fontFamily: type.semi, fontSize: 10, lineHeight: 15, maxWidth: 100, textAlign: "right" }, priceGuidance: { color: "#5F6368", fontFamily: type.regular, fontSize: 9, lineHeight: 14, marginTop: 9 }, priceGuidanceAlert: { color: "#8A5200" }, featureList: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 }, feature: { alignItems: "center", backgroundColor: "#F8F9FA", borderRadius: 8, flexDirection: "row", gap: 4, paddingHorizontal: 7, paddingVertical: 4 }, featureDot: { color: "#1A73E8", fontFamily: type.bold, fontSize: 11 }, featureText: { color: "#5F6368", fontFamily: type.regular, fontSize: 10 }, help: { color: "#5F6368", fontFamily: type.regular, fontSize: 11, lineHeight: 16, textAlign: "center" }, missing: { color: "#5F6368", fontFamily: type.regular, fontSize: 14 }, pressed: { opacity: 0.72 } });

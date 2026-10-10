@@ -5,10 +5,9 @@ import { useState } from "react";
 
 import { getService, serviceLogoSources } from "@/lib/catalog";
 import type { SubscriptionRecord } from "@/lib/subscription-types";
-import { formatRelativeRenewal, getHouseholdAllocation, monthlyAmount } from "@/lib/subscription-utils";
-import { useThemeContext } from "@/lib/theme-provider";
+import { formatDate, formatRelativeRenewal, getHouseholdAllocation, monthlyAmount } from "@/lib/subscription-utils";
 import { useMoneyFormatter } from "@/lib/privacy";
-import { useThemedStyles } from "@/lib/ui-theme";
+import { usePalette, useThemedStyles } from "@/lib/ui-theme";
 
 const baseStyles = () => styles;
 
@@ -19,32 +18,31 @@ const type = {
   bold: "Poppins-Bold",
 };
 
-export function ServiceBadge({ serviceId, size = "regular" }: { serviceId: string; size?: "small" | "regular" | "large" }) {
+export function ServiceBadge({ serviceId, size = "regular", label }: { serviceId: string; size?: "small" | "regular" | "large"; label?: string }) {
   const styles = useThemedStyles(baseStyles());
+  const colors = usePalette();
   const service = getService(serviceId);
   const [failed, setFailed] = useState(false);
   const dimension = size === "small" ? 36 : size === "large" ? 54 : 42;
   const labelSize = size === "small" ? 11 : size === "large" ? 16 : 13;
   const logoSource = serviceLogoSources[serviceId];
   return (
-    <View style={[styles.badge, { width: dimension, height: dimension, borderRadius: dimension / 2 }]}> 
-      {logoSource && !failed ? <Image source={logoSource} contentFit="contain" transition={120} cachePolicy="disk" accessibilityLabel={`${service?.name ?? "Service"} logo`} style={{ width: dimension * 0.7, height: dimension * 0.7 }} onError={() => setFailed(true)} /> : <View style={[styles.fallbackBadge, { width: dimension, height: dimension, borderRadius: dimension / 2, backgroundColor: service?.accent ?? "#1A73E8" }]}><Text style={[styles.badgeText, { fontSize: labelSize }]}>{service?.initials ?? "?"}</Text></View>}
+    <View style={[styles.badge, { width: dimension, height: dimension, borderRadius: dimension / 2 }, logoSource && !failed ? { backgroundColor: serviceId === "chatgpt" ? "#0F766E" : "#FFFFFF" } : null]}>
+      {logoSource && !failed ? <Image source={logoSource} contentFit="contain" transition={120} cachePolicy="disk" accessibilityLabel={`${service?.name ?? "Service"} logo`} style={{ width: dimension * 0.7, height: dimension * 0.7 }} onError={() => setFailed(true)} /> : <View style={[styles.fallbackBadge, { width: dimension, height: dimension, borderRadius: dimension / 2, backgroundColor: service?.accent ?? colors.primary }]}><Text style={[styles.badgeText, { fontSize: labelSize, color: service ? "white" : colors.onPrimary }]}>{service?.initials ?? (label?.trim()[0]?.toUpperCase() || "S")}</Text></View>}
     </View>
   );
 }
 
 export function Pill({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "teal" | "amber" | "coral" }) {
-  const styles = useThemedStyles(baseStyles());
-  const fill = tone === "teal" ? styles.pillGreen : tone === "amber" ? styles.pillAmber : tone === "coral" ? styles.pillRed : styles.pillNeutral;
-  const labelStyle = tone === "teal" ? styles.pillLabelGreen : tone === "amber" ? styles.pillLabelAmber : tone === "coral" ? styles.pillLabelRed : styles.pillLabelNeutral;
-  return <View style={[styles.pill, fill]}><Text style={[styles.pillLabel, labelStyle]}>{label}</Text></View>;
+  const colors = usePalette();
+  const color = tone === "teal" ? colors.primary : tone === "amber" ? colors.warning : tone === "coral" ? colors.danger : colors.muted;
+  return <View style={{ alignSelf: "flex-start", backgroundColor: colors.elevated, borderRadius: 9, paddingHorizontal: 8, paddingVertical: 5 }}><Text style={{ color, fontFamily: type.medium, fontSize: 10, textTransform: "capitalize" }}>{label}</Text></View>;
 }
 
 export function SectionLabel({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   const styles = useThemedStyles(baseStyles());
-  const { colorScheme } = useThemeContext();
-  const sectionTheme = colorScheme === "dark" ? sectionThemes.dark : sectionThemes.light;
-  return <View style={styles.sectionRow}><Text style={[styles.sectionTitle, sectionTheme.title]}>{title}</Text>{action && onAction ? <Pressable hitSlop={10} onPress={onAction}><Text style={[styles.sectionAction, sectionTheme.action]}>{action}</Text></Pressable> : null}</View>;
+  const colors = usePalette();
+  return <View style={styles.sectionRow}><Text style={[styles.sectionTitle, { color: colors.foreground }]}>{title}</Text>{action && onAction ? <Pressable accessibilityRole="button" style={{ minHeight: 44, justifyContent: "center" }} onPress={onAction}><Text style={[styles.sectionAction, { color: colors.primary }]}>{action}</Text></Pressable> : null}</View>;
 }
 
 export function PrimaryButton({ label, onPress, style, disabled = false }: { label: string; onPress: () => void; style?: ViewStyle; disabled?: boolean }) {
@@ -64,13 +62,13 @@ export function SubscriptionRow({ item, onPress, onQuickEdit, onDelete }: { item
   const tone = item.status === "trial" ? "amber" : item.status === "cancelled" ? "coral" : item.status === "uncertain" ? "neutral" : "teal";
   return (
     <View style={styles.subscriptionCard}>
-      <Pressable onPress={onPress} style={({ pressed }) => [styles.subscriptionRow, pressed && styles.rowPressed]}>
-        <ServiceBadge serviceId={item.serviceId} />
-        <View style={styles.subscriptionCopy}><Text style={styles.subscriptionName}>{service?.name ?? item.planName}</Text><Text style={styles.subscriptionMeta}>{item.planName} · {formatRelativeRenewal(item.renewalDate)}</Text>{(item.sharedMemberIds?.length ?? 1) > 1 ? <Text style={styles.sharedHint}>Shared plan · your share {formatCurrency(monthlyAmount(item.amount, item.cadence) * getHouseholdAllocation(item.sharedMemberIds ?? [], item.sharedMemberShares).owner / 100, item.currency)} / month</Text> : null}</View>
+      <Pressable accessibilityRole="button" accessibilityLabel={`View ${service?.name ?? item.planName}`} onPress={onPress} style={({ pressed }) => [styles.subscriptionRow, pressed && styles.rowPressed]}>
+        <ServiceBadge serviceId={item.serviceId} label={item.planName} />
+        <View style={styles.subscriptionCopy}><Text numberOfLines={1} style={styles.subscriptionName}>{service?.name ?? item.planName}</Text><Text numberOfLines={2} style={styles.subscriptionMeta}>{service ? `${item.planName} · ` : ""}{item.status === "cancelled" ? "Cancelled" : item.status === "trial" ? `Trial ends ${formatDate(item.trialEndDate ?? item.renewalDate)}` : formatRelativeRenewal(item.renewalDate)}</Text>{(item.sharedMemberIds?.length ?? 1) > 1 ? <Text numberOfLines={2} style={styles.sharedHint}>Shared plan · your share {formatCurrency(monthlyAmount(item.amount, item.cadence) * getHouseholdAllocation(item.sharedMemberIds ?? [], item.sharedMemberShares).owner / 100, item.currency)} / month</Text> : null}</View>
         <View style={styles.subscriptionAmount}><Text style={styles.amount}>{formatCurrency(item.amount, item.currency)}</Text><Pill label={item.status} tone={tone} /></View>
         <Text style={styles.chevron}>›</Text>
       </Pressable>
-      {onQuickEdit || onDelete ? <><View style={styles.rowDivider} /><View style={styles.rowActions}>{onQuickEdit ? <Pressable onPress={onQuickEdit} style={({ pressed }) => [styles.rowAction, pressed && styles.rowPressed]}><Text style={styles.quickEditText}>Quick edit</Text></Pressable> : null}{onDelete ? <Pressable onPress={onDelete} style={({ pressed }) => [styles.rowAction, pressed && styles.rowPressed]}><Text style={styles.deleteText}>Delete</Text></Pressable> : null}</View></> : null}
+      {onQuickEdit || onDelete ? <><View style={styles.rowDivider} /><View style={styles.rowActions}>{onQuickEdit ? <Pressable accessibilityRole="button" accessibilityLabel={`Quick edit ${service?.name ?? item.planName}`} onPress={onQuickEdit} style={({ pressed }) => [styles.rowAction, pressed && styles.rowPressed]}><Text style={styles.quickEditText}>Quick edit</Text></Pressable> : null}{onDelete ? <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${service?.name ?? item.planName}`} onPress={onDelete} style={({ pressed }) => [styles.rowAction, pressed && styles.rowPressed]}><Text style={styles.deleteText}>Delete</Text></Pressable> : null}</View></> : null}
     </View>
   );
 }
@@ -97,14 +95,9 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 14 },
   buttonPressed: { opacity: 0.78, transform: [{ scale: 0.99 }] }, buttonDisabled: { backgroundColor: "#687542" },
   subscriptionCard: { backgroundColor: "#191E0F", borderColor: "#343A25", borderRadius: 14, borderWidth: 1, overflow: "hidden" }, subscriptionRow: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 76, padding: 12 },
-  rowPressed: { backgroundColor: "#222916" }, subscriptionCopy: { flex: 1, minWidth: 0 }, subscriptionName: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 14 }, subscriptionMeta: { color: "#A8AD98", fontFamily: type.regular, fontSize: 11, marginTop: 3 }, sharedHint: { color: "#C9F72D", fontFamily: type.semi, fontSize: 9, marginTop: 3 },
-  subscriptionAmount: { alignItems: "flex-end", gap: 4 }, amount: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 13 }, chevron: { color: "#A8AD98", fontFamily: type.regular, fontSize: 24, lineHeight: 24 }, rowDivider: { backgroundColor: "#343A25", height: 1 }, rowActions: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 6, paddingVertical: 4 }, rowAction: { paddingHorizontal: 12, paddingVertical: 7 }, quickEditText: { color: "#C9F72D", fontFamily: type.semi, fontSize: 11 }, deleteText: { color: "#FF9B8C", fontFamily: type.semi, fontSize: 11 },
+  rowPressed: { opacity: 0.75 }, subscriptionCopy: { flex: 1, minWidth: 0 }, subscriptionName: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 14 }, subscriptionMeta: { color: "#A8AD98", fontFamily: type.regular, fontSize: 11, marginTop: 3 }, sharedHint: { color: "#C9F72D", fontFamily: type.semi, fontSize: 9, marginTop: 3 },
+  subscriptionAmount: { alignItems: "flex-end", gap: 4, maxWidth: "40%" }, amount: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 13 }, chevron: { color: "#A8AD98", fontFamily: type.regular, fontSize: 24, lineHeight: 24 }, rowDivider: { backgroundColor: "#343A25", height: 1 }, rowActions: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 6 }, rowAction: { paddingHorizontal: 12, paddingVertical: 7, minHeight: 44, justifyContent: "center" }, quickEditText: { color: "#C9F72D", fontFamily: type.semi, fontSize: 12 }, deleteText: { color: "#FF9B8C", fontFamily: type.semi, fontSize: 12 },
   emptyState: { alignItems: "center", backgroundColor: "#191E0F", borderColor: "#3A4227", borderRadius: 14, borderStyle: "dashed", borderWidth: 1, paddingHorizontal: 28, paddingVertical: 34 },
   emptySymbol: { alignItems: "center", backgroundColor: "#28301B", borderRadius: 22, height: 44, justifyContent: "center", marginBottom: 12, width: 44 }, emptySymbolText: { color: "#C9F72D", fontFamily: type.regular, fontSize: 26, lineHeight: 28 },
   emptyTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 15, textAlign: "center" }, emptyBody: { color: "#A8AD98", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 6, maxWidth: 270, textAlign: "center" },
 });
-
-const sectionThemes = {
-  light: StyleSheet.create({ title: { color: "#293015" }, action: { color: "#4A6510" } }),
-  dark: StyleSheet.create({ title: { color: "#F4F2E8" }, action: { color: "#C9F72D" } }),
-};

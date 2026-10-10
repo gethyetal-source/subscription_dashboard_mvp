@@ -44,7 +44,7 @@ export class LocalStateRepository {
     } catch { return []; }
   }
 
-  update(recipe: (state: ValidatedSnapshot) => ValidatedSnapshot | Promise<ValidatedSnapshot>, allowRecovery = false) {
+  update(recipe: (state: ValidatedSnapshot) => ValidatedSnapshot | Promise<ValidatedSnapshot>, allowRecovery = false, keepRecoverySnapshot = true) {
     const operation = this.tail.catch(() => undefined).then(async () => {
       await this.load();
       if (this.recoveryError && !allowRecovery) throw new Error(this.recoveryError);
@@ -52,7 +52,7 @@ export class LocalStateRepository {
       if (this.recoveryError) {
         const raw = await this.storage.getItem(STORAGE_KEY);
         if (raw) await this.storage.setItem("subtrack.unreadable-state.v1", raw);
-      } else {
+      } else if (keepRecoverySnapshot) {
         const backups = await this.backups();
         await this.storage.setItem(BACKUP_KEY, JSON.stringify([createBackup(this.current), ...backups].slice(0, 5)));
       }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getCountry } from "./countries";
 
 const text = z.string().max(10_000);
 const id = z.string().trim().min(1).max(200);
@@ -48,6 +49,7 @@ export const settingsSchema = z.object({
   reminderDays: z.number().int().min(0).max(90),
   notificationsEnabled: z.boolean(), dashboardSort: z.enum(["upcoming", "highest-cost"]),
   monthlyBudget: money, budgetCurrency: currency.optional(),
+  countryCode: z.string().trim().toUpperCase().refine((code) => !!getCountry(code), "Choose a supported country.").optional(),
   onboardingCompleted: z.boolean().optional(),
 });
 export const memberSchema = z.object({
@@ -129,6 +131,7 @@ export function parseBackup(serialized: string): ValidatedSnapshot {
 
 export function describeDataError(error: unknown) {
   return error instanceof z.ZodError
-    ? `Invalid data: ${error.issues[0]?.path.join(".") || "backup"} (${error.issues[0]?.message}). Your existing records have not been changed.`
+    ? "This backup contains invalid or unsupported data. Your existing records have not been changed."
+    : error instanceof SyntaxError ? "This file is not a readable backup. Your existing records have not been changed."
     : error instanceof Error ? error.message : "Data could not be read. Your existing records have not been changed.";
 }

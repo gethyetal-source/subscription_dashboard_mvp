@@ -8,21 +8,26 @@ import { useMoneyFormatter } from "@/lib/privacy";
 import { useSubscriptions } from "@/lib/subscription-store";
 import type { BillingCadence } from "@/lib/subscription-types";
 import { localDateSchema } from "@/lib/data-safety";
+import { defaultCurrency, getCountry } from "@/lib/countries";
 
 export default function RegionalPlansScreen() {
   const params = useLocalSearchParams<{ serviceId?: string }>();
   const store = useSubscriptions(); const money = useMoneyFormatter();
   const [serviceId, setServiceId] = useState(params.serviceId ?? services[0].id);
   const service = getService(serviceId)!;
-  const [query, setQuery] = useState(""); const [country, setCountry] = useState("IN");
-  const [currency, setCurrency] = useState(store.settings.budgetCurrency ?? "USD");
+  const [query, setQuery] = useState(""); const [country, setCountry] = useState(store.settings.countryCode ?? "");
+  const [currency, setCurrency] = useState(defaultCurrency(store.settings));
   const [quotes, setQuotes] = useState<Record<string, { amount: string; cadence: BillingCadence }>>({});
   const [verifiedOn, setVerifiedOn] = useState(localDateKey()); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   return <Page title="Regional plan comparison" subtitle="Catalog labels are references, not live quotes. Enter the price shown on the official page for your country; no currency conversion is performed.">
     <Card title="Choose your market">
       <Field label="Find a service" value={query} onChangeText={setQuery} />
       {services.filter((item) => item.name.toLowerCase().includes(query.toLowerCase())).slice(0, query ? 8 : 3).map((item) => <Button key={item.id} label={item.name} secondary={serviceId !== item.id} onPress={() => { setServiceId(item.id); setQuotes({}); }} />)}
-      <Field label="Country code" value={country} onChangeText={setCountry} maxLength={2} autoCapitalize="characters" />
+      <Field label="Country code" value={country} onChangeText={(code) => {
+        setCountry(code);
+        const next = getCountry(code);
+        if (next) { setCurrency(next.currency); setQuotes({}); }
+      }} maxLength={2} autoCapitalize="characters" />
       <Field label="Currency for every quote below" value={currency} onChangeText={setCurrency} maxLength={3} autoCapitalize="characters" />
       <Field label="Date you checked the official prices" value={verifiedOn} onChangeText={setVerifiedOn} />
       <Button label={`Open ${service.name}'s official page`} secondary onPress={() => void WebBrowser.openBrowserAsync(service.officialUrl).catch(() => setMessage("Could not open the provider page."))} />

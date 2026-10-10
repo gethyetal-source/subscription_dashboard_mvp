@@ -1,3 +1,10 @@
+# Historical roadmap
+
+This proposal is superseded by the current account-only policy. Sign-in is
+required, Supabase stores account details only, and financial cloud transfers
+and cross-device household sharing are disabled. See
+[google-authentication.md](google-authentication.md).
+
 # SubTrack Cloud Sync and Product Roadmap
 
 ## Product decision

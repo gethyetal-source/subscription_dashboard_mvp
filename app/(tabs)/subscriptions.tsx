@@ -1,167 +1,135 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useThemedStyles } from "@/lib/ui-theme";
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useMemo, useState } from "react";
-
+import { FlatList, Pressable, Text, View } from "react-native";
+import { Button, ChoiceChips, ConfirmDialog, Field, Notice } from "@/components/app-ui";
 import { DatePickerSheet } from "@/components/date-picker-sheet";
-import { EmptyState, SubscriptionRow } from "@/components/subscription-ui";
+import { ActionSheet, EmptyIllustration, FinanceHeader, FinanceLink, RoundAction, SearchField, financeType } from "@/components/finance-ui";
 import { ScreenContainer } from "@/components/screen-container";
-import { ElectricPageHeader } from "@/components/electric-page-header";
+import { ServiceBadge } from "@/components/subscription-ui";
+import { getService } from "@/lib/catalog";
+import { localDateSchema } from "@/lib/data-safety";
+import { deadlineLabel, financeLedger, shortDate, subscriptionName } from "@/lib/finance-overview";
+import { parseMoneyInput } from "@/lib/form-utils";
+import { useMoneyFormatter } from "@/lib/privacy";
+import { getRenewalQueue } from "@/lib/renewal-queue";
 import { useSubscriptions } from "@/lib/subscription-store";
-import type { SubscriptionDraft, SubscriptionRecord, SubscriptionStatus } from "@/lib/subscription-types";
-import { isFutureDate, nextLocalDateKey } from "@/lib/subscription-utils";
+import type { SubscriptionDraft, SubscriptionRecord } from "@/lib/subscription-types";
+import { localDateKey } from "@/lib/subscription-utils";
+import { usePalette } from "@/lib/ui-theme";
 
-const filters: { label: string; value: "all" | SubscriptionStatus }[] = [{ label: "All", value: "all" }, { label: "Active", value: "active" }, { label: "Trials", value: "trial" }, { label: "Pending / uncertain", value: "uncertain" }, { label: "Cancelled / archived", value: "cancelled" }];
-const type = { regular: "Poppins-Regular", semi: "Poppins-SemiBold", bold: "Poppins-Bold" };
+type Filter = "current" | "trial" | "cancelled";
+const filters = [{ label: "Current", value: "current" }, { label: "Trials", value: "trial" }, { label: "Archived", value: "cancelled" }] as const;
+const cadenceCopy = { weekly: "/ week", monthly: "/ month", quarterly: "/ quarter", yearly: "/ year" };
 
-const baseStyles = () => ({ styles, electric, revamp });
 export default function SubscriptionsScreen() {
-  const { styles, electric, revamp } = useThemedStyles(baseStyles());
-  const { subscriptions, updateSubscription, deleteSubscription } = useSubscriptions();
-  const [filter, setFilter] = useState<"all" | SubscriptionStatus>("all");
-  const [quickEditRecord, setQuickEditRecord] = useState<SubscriptionRecord | null>(null);
-  const [amountInput, setAmountInput] = useState("");
-  const [renewalDate, setRenewalDate] = useState("");
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [amountError, setAmountError] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [deleteCandidate, setDeleteCandidate] = useState<SubscriptionRecord | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
-  const filtered = useMemo(() => filter === "all" ? subscriptions : subscriptions.filter((item) => item.status === filter), [filter, subscriptions]);
+  const colors = usePalette();
+  const money = useMoneyFormatter();
+  const store = useSubscriptions();
+  const [filter, setFilter] = useState<Filter>("current");
+  const [search, setSearch] = useState("");
+  const [actions, setActions] = useState<SubscriptionRecord | null>(null);
+  const [tools, setTools] = useState(false);
+  const [editing, setEditing] = useState<SubscriptionRecord | null>(null);
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState("");
+  const [picker, setPicker] = useState(false);
+  const [deleting, setDeleting] = useState<SubscriptionRecord | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [editError, setEditError] = useState("");
+  const dueDates = new Map(getRenewalQueue(store.subscriptions).filter((item) => item.kind !== "cancellation").map((item) => [item.record.id, item.due]));
+  const filtered = useMemo(() => financeLedger(store.subscriptions, filter, search), [store.subscriptions, search, filter]);
 
-  const openQuickEdit = (record: SubscriptionRecord) => {
-    setQuickEditRecord(record);
-    setAmountInput(String(record.amount));
-    setRenewalDate(record.renewalDate);
-    setAmountError("");
+  const quickEdit = () => {
+    if (!actions) return;
+    setAmount(String(actions.amount)); setDate(actions.renewalDate); setEditError("");
+    setEditing(actions); setActions(null);
   };
-
-  const closeQuickEdit = () => {
-    if (isSaving) return;
-    setQuickEditRecord(null);
-    setShowDatePicker(false);
-    setAmountError("");
-  };
-
   const saveQuickEdit = async () => {
-    if (!quickEditRecord || isSaving) return;
-    const amount = Number.parseFloat(amountInput);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setAmountError("Enter an amount greater than 0.");
-      return;
-    }
-    if (!isFutureDate(renewalDate)) {
-      setAmountError("Choose a renewal date after today.");
-      return;
-    }
-
-    setIsSaving(true);
-    const { id, createdAt: _createdAt, updatedAt: _updatedAt, reminderIdentifier: _reminderIdentifier, ...draft } = quickEditRecord;
+    if (!editing || busy) return;
+    const value = parseMoneyInput(amount);
+    if (value === undefined) { setEditError("Enter a valid amount, including 0 for a free plan."); return; }
+    if (!localDateSchema.safeParse(date).success || (date !== editing.renewalDate && date < localDateKey())) { setEditError("Choose today or a future date."); return; }
+    setBusy(true); setEditError("");
     try {
-      await updateSubscription(id, { ...draft, amount, renewalDate } satisfies SubscriptionDraft);
-      setQuickEditRecord(null);
-    } catch (error) {
-      setAmountError(error instanceof Error ? error.message : "Could not save.");
-    } finally {
-      setIsSaving(false);
-    }
+      const { id, createdAt: _created, updatedAt: _updated, reminderIdentifier: _reminder, reminderIdentifiers: _reminders, ...draft } = editing;
+      await store.updateSubscription(id, { ...draft, amount: value, renewalDate: date } satisfies SubscriptionDraft);
+      setEditing(null);
+    } catch { setEditError("Could not save your changes. Please try again."); }
+    finally { setBusy(false); }
   };
-
   const deleteRecord = async () => {
-    if (!deleteCandidate || isDeleting) return;
-    const record = deleteCandidate;
-    setDeleteCandidate(null);
-    setDeleteError("");
-    setIsDeleting(true);
-    try {
-      await deleteSubscription(record.id);
-    } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : "The record was not deleted. Please try again.");
-    } finally {
-      setIsDeleting(false);
-    }
+    if (!deleting || busy) return;
+    setBusy(true); setError("");
+    try { await store.deleteSubscription(deleting.id); setDeleting(null); }
+    catch { setDeleting(null); setError("The subscription was not removed. Please try again."); }
+    finally { setBusy(false); }
   };
 
-  return <ScreenContainer className="px-5" containerClassName="bg-background">
-    <FlatList
-      data={filtered}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      ListHeaderComponent={<><ElectricPageHeader title="Subscriptions" subtitle="Everything you track, in one place." trailing={<Pressable accessibilityRole="button" accessibilityLabel="Add subscription" onPress={() => router.push("/(tabs)/discover")} style={({ pressed }) => [electric.addButton, pressed && styles.pressed]}><Text style={electric.addText}>Add</Text></Pressable>} /><View style={[styles.filters, revamp.filters]}>{filters.map((item) => <Pressable key={item.value} onPress={() => setFilter(item.value)} style={({ pressed }) => [styles.filter, filter === item.value && styles.filterSelected, filter === item.value && revamp.filterSelected, pressed && styles.pressed]}><Text style={[styles.filterText, filter === item.value && styles.filterTextSelected, filter === item.value && revamp.filterTextSelected]}>{item.label}</Text></Pressable>)}</View>{deleteError ? <Text accessibilityRole="alert" style={styles.errorText}>{deleteError}</Text> : null}</>}
-      ListEmptyComponent={<EmptyState title="No subscriptions here" body="Explore the catalog to add a plan, price, renewal date, and billing source." />}
-      renderItem={({ item }) => <SubscriptionRow item={item} onPress={() => router.push(`/subscription/${item.id}` as never)} onQuickEdit={() => openQuickEdit(item)} onDelete={() => setDeleteCandidate(item)} />}
-      ItemSeparatorComponent={() => <View style={styles.separator} />}
+  return <ScreenContainer>
+    <FlatList data={filtered} keyExtractor={(item) => item.id} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ padding: 22, paddingBottom: 32 }}
+      ListHeaderComponent={<View style={{ gap: 22, marginBottom: 22 }}>
+        <FinanceHeader title="Subscriptions" trailing={<View style={{ flexDirection: "row", gap: 7 }}>
+          <RoundAction icon="ellipsis-horizontal" label="Subscription options" onPress={() => setTools(true)} />
+          {store.subscriptions.length ? <RoundAction icon="add" primary label="Add subscription" onPress={() => router.push("/quick-add")} /> : null}
+        </View>} />
+        {store.subscriptions.length ? <>
+          <SearchField value={search} onChange={setSearch} label="Search your subscriptions" placeholder="Search your subscriptions" />
+          <View style={{ flexDirection: "row", gap: 7 }}>
+            {filters.map((option) => <Pressable key={option.value} accessibilityRole="button" accessibilityState={{ selected: filter === option.value }} onPress={() => setFilter(option.value)}
+              style={({ pressed }) => ({ flex: 1, borderRadius: 12, backgroundColor: filter === option.value ? colors.primary : colors.elevated, minHeight: 44, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.7 : 1 })}>
+              <Text style={{ fontFamily: financeType.medium, fontSize: 12, color: filter === option.value ? colors.onPrimary : colors.muted }}>{option.label}</Text>
+            </Pressable>)}
+          </View>
+          <Text style={{ color: colors.muted, fontFamily: financeType.medium, fontSize: 11 }}>{filtered.length} subscription{filtered.length === 1 ? "" : "s"}</Text>
+        </> : null}
+        {error ? <Notice error>{error}</Notice> : null}
+      </View>}
+      ListEmptyComponent={<EmptyIllustration title={search ? "No matches" : filter === "cancelled" ? "Nothing archived" : filter === "trial" ? "No trials to track" : "Your subscriptions, organized."}
+        body={search ? "Try a service or plan name." : filter === "cancelled" ? "Subscriptions you mark cancelled will appear here." : filter === "trial" ? "Add a trial to stay ahead of its first charge." : "Add what you pay for. Know what’s coming next."}
+        action={filter === "current" && !search ? <Button label="Add a subscription" onPress={() => router.push("/quick-add")} /> : <Button label={search ? "Clear search" : "View current subscriptions"} secondary onPress={() => { setSearch(""); setFilter("current"); }} />} />}
+      renderItem={({ item }) => {
+        const due = dueDates.get(item.id);
+        const secondary = item.cancellationState === "pending" ? "Cancellation pending" : item.status === "cancelled" ? "Archived" : item.status === "trial" ? `Trial ends ${due ? deadlineLabel(due) : shortDate(item.trialEndDate ?? item.renewalDate)}` : due ? `${item.autoRenewStatus === "off" ? "Last saved date" : "Next"} · ${deadlineLabel(due)}` : "No upcoming renewal";
+        return <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: 18, paddingLeft: 14, paddingRight: 4, borderWidth: 1, borderColor: colors.border }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`View ${subscriptionName(item)}`} onPress={() => router.push(`/subscription/${item.id}` as never)}
+            style={({ pressed }) => ({ flex: 1, flexDirection: "row", alignItems: "center", gap: 11, paddingVertical: 16, opacity: pressed ? 0.7 : 1 })}>
+            <ServiceBadge serviceId={item.serviceId} label={item.planName} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text numberOfLines={1} style={{ color: colors.foreground, fontFamily: financeType.semi, fontSize: 13 }}>{subscriptionName(item)}</Text>
+              {getService(item.serviceId) && item.planName !== subscriptionName(item) ? <Text numberOfLines={1} style={{ color: colors.muted, fontFamily: financeType.regular, fontSize: 10, marginTop: 2 }}>{item.planName}</Text> : null}
+              <Text style={{ color: item.status === "trial" || item.cancellationState === "pending" ? colors.warning : colors.muted, fontFamily: financeType.regular, fontSize: 10, marginTop: 4 }}>{secondary}</Text>
+            </View>
+            <View style={{ alignItems: "flex-end", maxWidth: "42%" }}>
+              <Text style={{ color: colors.foreground, fontFamily: financeType.semi, fontSize: 13, textAlign: "right" }}>{money(item.amount, item.currency)}</Text>
+              <Text style={{ color: colors.muted, fontFamily: financeType.regular, fontSize: 10, marginTop: 4 }}>{cadenceCopy[item.cadence]}</Text>
+            </View>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${subscriptionName(item)}`} onPress={() => setActions(item)} style={{ width: 44, height: 48, justifyContent: "center", alignItems: "center" }}><Ionicons name="ellipsis-vertical" size={17} color={colors.muted} aria-hidden /></Pressable>
+        </View>;
+      }}
+      ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+      ListFooterComponent={filter === "cancelled" && filtered.length ? <View style={{ paddingTop: 16 }}><FinanceLink icon="archive-outline" title="Archived spending summary" onPress={() => router.push("/archive-insights")} /></View> : null}
     />
-
-    <Modal visible={!!quickEditRecord} transparent animationType="slide" onRequestClose={closeQuickEdit}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.quickEditSheet}>
-          <View style={styles.sheetHeader}><View><Text style={styles.sheetTitle}>Quick edit</Text><Text style={styles.sheetCaption}>Update this local amount and renewal date.</Text></View><Pressable onPress={closeQuickEdit} hitSlop={10}><Text style={styles.close}>×</Text></Pressable></View>
-          <Text style={styles.fieldLabel}>Amount</Text>
-          <TextInput value={amountInput} onChangeText={(value) => { setAmountInput(value); if (amountError) setAmountError(""); }} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor="#80868B" style={[styles.input, amountError && styles.inputError]} />
-          <Text style={styles.errorText}>{amountError || " "}</Text>
-          <Text style={styles.fieldLabel}>Next renewal</Text>
-          <Pressable onPress={() => setShowDatePicker(true)} style={({ pressed }) => [styles.dateField, pressed && styles.pressed]}><Text style={styles.dateValue}>{renewalDate || "Select a date"}</Text><Text style={styles.calendarIcon}>⌄</Text></Pressable>
-          <View style={styles.sheetActions}><Pressable onPress={closeQuickEdit} disabled={isSaving} style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}><Text style={styles.cancelButtonText}>Cancel</Text></Pressable><Pressable onPress={() => void saveQuickEdit()} disabled={isSaving} style={({ pressed }) => [styles.saveButton, isSaving && styles.disabled, pressed && styles.pressed]}><Text style={styles.saveButtonText}>{isSaving ? "Saving…" : "Save changes"}</Text></Pressable></View>
-        </View>
-      </View>
-    </Modal>
-    <DatePickerSheet visible={showDatePicker} value={renewalDate} minDate={nextLocalDateKey()} title="Select renewal date" onClose={() => setShowDatePicker(false)} onSelect={setRenewalDate} />
-
-    <Modal visible={!!deleteCandidate} transparent animationType="fade" onRequestClose={() => !isDeleting && setDeleteCandidate(null)}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.deleteSheet}>
-          <Text style={styles.deleteTitle}>Delete local record?</Text>
-          <Text style={styles.deleteBody}>This removes the local subscription record and reminder. It does not cancel the provider subscription.</Text>
-          <View style={styles.sheetActions}><Pressable disabled={isDeleting} onPress={() => setDeleteCandidate(null)} style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}><Text style={styles.cancelButtonText}>Cancel</Text></Pressable><Pressable disabled={isDeleting} onPress={() => void deleteRecord()} style={({ pressed }) => [styles.deleteButton, isDeleting && styles.disabled, pressed && styles.pressed]}><Text style={styles.deleteButtonText}>{isDeleting ? "Deleting…" : "Delete record"}</Text></Pressable></View>
-        </View>
-      </View>
-    </Modal>
+    <ActionSheet visible={!!actions} title={actions ? subscriptionName(actions) : "Subscription"} onClose={() => setActions(null)}>
+      <FinanceLink icon="create-outline" title="Edit details" onPress={() => { const record = actions; setActions(null); if (record) router.push({ pathname: "/subscription/edit", params: { subscriptionId: record.id } }); }} />
+      <FinanceLink icon="cash-outline" title="Quick edit price & date" onPress={quickEdit} />
+      <FinanceLink icon="trash-outline" title="Remove subscription" danger onPress={() => { setDeleting(actions); setActions(null); }} />
+    </ActionSheet>
+    <ActionSheet visible={tools} title="Subscriptions" onClose={() => setTools(false)}>
+      <FinanceLink icon="help-circle-outline" title="Recognize a charge" detail="Match a statement entry to a saved subscription" onPress={() => { setTools(false); router.push("/charge-recognition"); }} />
+      <FinanceLink icon="receipt-outline" title="Billing references & history" onPress={() => { setTools(false); router.push("/evidence-index"); }} />
+    </ActionSheet>
+    <ActionSheet visible={!!editing} title="Quick edit" onClose={() => { if (!busy) setEditing(null); }}>
+      <Field label="Subscription amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" editable={!busy} />
+      <Button label={date ? `Next renewal · ${shortDate(date)}` : "Choose next renewal date"} secondary disabled={busy} onPress={() => setPicker(true)} />
+      <ChoiceChips label="Quick date" value="" options={[{ value: "today", label: "Today" }]} disabled={busy} onChange={() => setDate(localDateKey())} />
+      {editError ? <Notice error>{editError}</Notice> : null}
+      <Button label={busy ? "Saving…" : "Save changes"} disabled={busy} onPress={() => void saveQuickEdit()} />
+    </ActionSheet>
+    <DatePickerSheet visible={picker} value={date} minDate={localDateKey()} title="Next renewal" onClose={() => setPicker(false)} onSelect={setDate} />
+    <ConfirmDialog visible={!!deleting} title="Remove this subscription?" message="This removes the saved record and its reminders. It does not cancel your plan with the provider." confirmLabel="Remove subscription" danger busy={busy} onCancel={() => setDeleting(null)} onConfirm={() => void deleteRecord()} />
   </ScreenContainer>;
 }
-
-const styles = StyleSheet.create({
-  content: { paddingBottom: 28, paddingTop: 16 },
-  header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 17 },
-  title: { color: "#202124", fontFamily: type.bold, fontSize: 27, letterSpacing: -0.8 },
-  subtitle: { color: "#5F6368", fontFamily: type.regular, fontSize: 12, marginTop: 3 },
-  addButton: { backgroundColor: "#1A73E8", borderRadius: 22, paddingHorizontal: 17, paddingVertical: 11 },
-  addText: { color: "#FFFFFF", fontFamily: type.semi, fontSize: 12 },
-  filters: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
-  filter: { backgroundColor: "#1D2212", borderColor: "#343A25", borderRadius: 10, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 8 },
-  filterSelected: { backgroundColor: "#C9F72D" },
-  filterText: { color: "#C5CBB8", fontFamily: type.semi, fontSize: 11 },
-  filterTextSelected: { color: "#172108", fontFamily: type.semi, fontSize: 11 },
-  separator: { height: 10 },
-  modalBackdrop: { backgroundColor: "rgba(6,8,3,0.74)", flex: 1, justifyContent: "flex-end" },
-  quickEditSheet: { backgroundColor: "#191E0F", borderColor: "#3A4227", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, padding: 20 },
-  deleteSheet: { backgroundColor: "#191E0F", borderColor: "#3A4227", borderRadius: 20, borderWidth: 1, margin: 20, padding: 20 },
-  sheetHeader: { alignItems: "flex-start", flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
-  sheetTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 17 },
-  sheetCaption: { color: "#A8AD98", fontFamily: type.regular, fontSize: 11, marginTop: 3 },
-  close: { color: "#A8AD98", fontFamily: type.regular, fontSize: 28, lineHeight: 28 },
-  fieldLabel: { color: "#C5CBB8", fontFamily: type.semi, fontSize: 12, marginBottom: 7, marginTop: 3 },
-  input: { backgroundColor: "#12160B", borderColor: "#3A4227", borderRadius: 12, borderWidth: 1, color: "#F4F2E8", fontFamily: type.regular, fontSize: 15, minHeight: 48, paddingHorizontal: 13 },
-  inputError: { borderColor: "#FF8A7A" },
-  errorText: { color: "#FF9B8C", fontFamily: type.regular, fontSize: 10, minHeight: 18, paddingTop: 4 },
-  dateField: { alignItems: "center", backgroundColor: "#12160B", borderColor: "#3A4227", borderRadius: 12, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", minHeight: 48, paddingHorizontal: 13 },
-  dateValue: { color: "#F4F2E8", fontFamily: type.regular, fontSize: 14 },
-  calendarIcon: { color: "#C9F72D", fontFamily: type.semi, fontSize: 18 },
-  sheetActions: { flexDirection: "row", gap: 10, justifyContent: "flex-end", marginTop: 22 },
-  cancelButton: { alignItems: "center", borderColor: "#3A4227", borderRadius: 12, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 17 },
-  cancelButtonText: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 12 },
-  saveButton: { alignItems: "center", backgroundColor: "#C9F72D", borderRadius: 12, justifyContent: "center", minHeight: 44, paddingHorizontal: 17 },
-  saveButtonText: { color: "#172108", fontFamily: type.semi, fontSize: 12 },
-  deleteTitle: { color: "#F4F2E8", fontFamily: type.semi, fontSize: 17 },
-  deleteBody: { color: "#A8AD98", fontFamily: type.regular, fontSize: 12, lineHeight: 18, marginTop: 8 },
-  deleteButton: { alignItems: "center", backgroundColor: "#C5221F", borderRadius: 22, justifyContent: "center", minHeight: 44, paddingHorizontal: 17 },
-  deleteButtonText: { color: "white", fontFamily: type.semi, fontSize: 12 },
-  disabled: { opacity: 0.56 },
-  pressed: { opacity: 0.75 },
-});
-
-const electric = StyleSheet.create({ addButton: { alignItems: "center", backgroundColor: "#C9F72D", borderRadius: 12, justifyContent: "center", minHeight: 38, paddingHorizontal: 13 }, addText: { color: "#172108", fontFamily: type.semi, fontSize: 12 } });
-
-const revamp = StyleSheet.create({ filters: { marginTop: 16 }, filterSelected: { backgroundColor: "#C9F72D", borderColor: "#C9F72D" }, filterTextSelected: { color: "#172108" } });

@@ -13,7 +13,7 @@ function response(status: number, body: Record<string, unknown>) {
 }
 
 /**
- * Deletes only the authenticated caller's optional SubTrack account and backup.
+ * Deletes only the authenticated caller's SubTrack sign-in and profile.
  * The service-role credential is supplied by the Edge runtime and is never sent to the app.
  */
 Deno.serve(async (request) => {
@@ -33,10 +33,8 @@ Deno.serve(async (request) => {
   if (userError || !user) return response(401, { error: "Your session could not be verified." });
 
   const admin = createClient(projectUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { error: backupError } = await admin.from("subtrack_sync_state").delete().eq("user_id", user.id);
-  if (backupError) return response(500, { error: "Your cloud backup could not be removed. The account was not deleted." });
-
+  // Foreign-key cascades also remove any legacy backup owned by this account.
   const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
-  if (deleteError) return response(500, { error: "Your cloud account could not be deleted. Please try again." });
+  if (deleteError) return response(500, { error: "Your account could not be deleted. Please try again." });
   return response(200, { deleted: true });
 });
